@@ -76,6 +76,27 @@ export type ModVital = {
   messagedMsAgo?: number;
 };
 
+// --- Burnout Watch ---
+// Predictive companion to Mod Team Vitals: vitals describe *current* state,
+// burnout predicts who's likely to flatline next so Mod Team Care can reach
+// out before the silence happens.
+export type BurnoutTier = 'healthy' | 'watching' | 'at-risk';
+
+export type BurnoutMod = {
+  name: string;
+  score: number;            // 0–100; higher = closer to flatline
+  tier: BurnoutTier;
+  signals: string[];        // human-readable signals driving the score
+  last7d: number;           // actions in the last 7 days
+  prev7d: number;           // actions in the 7 days before that
+  daysIdle: number;         // days since last seen
+};
+
+export type BurnoutResponse = {
+  mods: BurnoutMod[];       // ordered by score desc (highest risk first)
+  generatedAt: number;
+};
+
 export type TeamVitalsResponse = {
   mods: ModVital[];
 };
@@ -186,6 +207,7 @@ export const ApiEndpoint = {
   SaveSettings: "/api/save-settings",
   SecondOpinion: "/api/second-opinion",
   SaveSecondOpinion: "/api/save-second-opinion",
+  Burnout: "/api/burnout",
 } as const;
 
 export type ApiEndpoint = (typeof ApiEndpoint)[keyof typeof ApiEndpoint];

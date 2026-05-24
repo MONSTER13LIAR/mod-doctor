@@ -23,6 +23,9 @@ import {
   type DisputeEntry,
   type BrainHealth,
   type BrainTier,
+  type BurnoutMod,
+  type BurnoutTier,
+  type BurnoutResponse,
   HEARTBEAT_KEY,
   DEFAULT_CRISIS_THRESHOLD_MS,
   formatDuration,
@@ -57,6 +60,7 @@ const MOD_ONLY_ENDPOINTS = new Set<string>([
   ApiEndpoint.SaveSettings,
   ApiEndpoint.SecondOpinion,
   ApiEndpoint.SaveSecondOpinion,
+  ApiEndpoint.Burnout,
 ]);
 
 async function onRequest(
@@ -169,6 +173,9 @@ async function onRequest(
       break;
     case ApiEndpoint.SaveSecondOpinion:
       body = await onSaveSecondOpinion(req);
+      break;
+    case ApiEndpoint.Burnout:
+      body = await onBurnout();
       break;
     case "/internal/scheduled/weekly-report":
       body = await onScheduledWeeklyReport();
@@ -746,12 +753,25 @@ async function runSecondOpinion(payload: {
 // surrogate. recordModActivity logs every genuine human mod action so the
 // dashboard can show a per-moderator health chart.
 
-type ModRecord = { lastSeen: number; actions: number; messagedAt?: number };
+// `daily` is a YYYY-MM-DD -> action-count map, pruned to the last 30 days.
+// It's what powers Burnout Watch's week-over-week trend signal without
+// adding any new Redis keys or a per-event log.
+type ModRecord = {
+  lastSeen: number;
+  actions: number;
+  daily?: Record<string, number>;
+  messagedAt?: number;
+};
 type ModTeam = Record<string, ModRecord>;
 
 const FLATLINE_MS = 7 * 24 * 60 * 60 * 1000;
 const MESSAGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const DEMOTION_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
+const DAILY_RETENTION_DAYS = 30;
+
+function dayKey(t: number): string {
+  return new Date(t).toISOString().slice(0, 10);
+}
 
 async function recordModActivity(modName: string, now: number): Promise<void> {
   const raw = await redis.get('dr_mod:mod_team');
@@ -760,6 +780,15 @@ async function recordModActivity(modName: string, now: number): Promise<void> {
   const rec = team[modName] || { lastSeen: 0, actions: 0 };
   rec.lastSeen = now;
   rec.actions += 1;
+
+  const dk = dayKey(now);
+  rec.daily = rec.daily || {};
+  rec.daily[dk] = (rec.daily[dk] || 0) + 1;
+  const cutoff = dayKey(now - DAILY_RETENTION_DAYS * DAY_MS);
+  for (const k of Object.keys(rec.daily)) {
+    if (k < cutoff) delete rec.daily[k];
+  }
+
   team[modName] = rec;
   await redis.set('dr_mod:mod_team', JSON.stringify(team));
 }
@@ -811,6 +840,106 @@ async function runModCarePass(): Promise<{ messaged: string[]; skipped: string[]
     await redis.set('dr_mod:mod_team', JSON.stringify(team));
   }
   return { messaged, skipped };
+}
+
+// --- BURNOUT WATCH ---
+// Companion to Mod Team Vitals. Vitals report *current* state (ACTIVE / IDLE /
+// FLATLINE); Burnout predicts who is most likely to flatline next so Mod Team
+// Care can reach out before the silence happens. Pure-heuristic, no AI calls,
+// derived from the per-mod daily action buckets in mod_team.
+
+function actionsInWindow(daily: Record<string, number> | undefined, now: number, startDaysAgo: number, endDaysAgo: number): number {
+  if (!daily) return 0;
+  // startDaysAgo is the older bound, endDaysAgo the newer (both inclusive).
+  // e.g. (7, 0) = last 7 days; (14, 7) = the prior 7 days.
+  const fromKey = dayKey(now - startDaysAgo * DAY_MS);
+  const toKey = dayKey(now - endDaysAgo * DAY_MS);
+  let total = 0;
+  for (const [k, v] of Object.entries(daily)) {
+    if (k >= fromKey && k <= toKey) total += v;
+  }
+  return total;
+}
+
+function computeBurnout(rec: ModRecord, teamLast7d: number, teamSize: number, now: number): BurnoutMod {
+  const last7d = actionsInWindow(rec.daily, now, 6, 0);
+  const prev7d = actionsInWindow(rec.daily, now, 13, 7);
+  const daysIdle = Math.max(0, Math.floor((now - rec.lastSeen) / DAY_MS));
+  const signals: string[] = [];
+  let score = 0;
+
+  // Signal 1 — idle proximity. Once a mod is more than ~3 days quiet they
+  // are halfway to flatline; the score should already be flashing.
+  const idleRatio = Math.min((now - rec.lastSeen) / FLATLINE_MS, 1.0);
+  if (idleRatio >= 0.3) {
+    score += Math.round(idleRatio * 40);
+    signals.push(`Quiet for ${daysIdle}d (flatline at 7d)`);
+  }
+
+  // Signal 2 — week-over-week decline. Needs a baseline of meaningful prior
+  // activity (≥5 actions) so brand-new mods don't fire it.
+  if (prev7d >= 5 && last7d < prev7d * 0.5) {
+    const dropPct = Math.round((1 - last7d / prev7d) * 100);
+    score += 25;
+    signals.push(`Actions down ${dropPct}% vs prior week (${prev7d} → ${last7d})`);
+  }
+
+  // Signal 3 — outsized workload share. If one mod is doing the work of two
+  // on a team of three or more, they're a burnout candidate even when active.
+  if (teamSize >= 3 && teamLast7d >= 10) {
+    const share = last7d / teamLast7d;
+    const expected = 1 / teamSize;
+    if (share >= expected * 2.5) {
+      score += 25;
+      signals.push(`Carrying ${Math.round(share * 100)}% of team workload (expected ~${Math.round(expected * 100)}%)`);
+    }
+  }
+
+  // Signal 4 — was busy, now silent. Caught the "I was the workhorse, then I
+  // vanished" pattern that idle alone wouldn't catch yet.
+  if (prev7d >= 15 && last7d <= 1 && daysIdle >= 2) {
+    score += 15;
+    signals.push(`Was active (${prev7d} actions last week) but suddenly quiet`);
+  }
+
+  score = Math.min(score, 100);
+  const tier: BurnoutTier =
+    score >= 60 ? 'at-risk' :
+    score >= 30 ? 'watching' :
+    'healthy';
+
+  return {
+    name: '',  // filled by caller
+    score,
+    tier,
+    signals,
+    last7d,
+    prev7d,
+    daysIdle,
+  };
+}
+
+async function onBurnout(): Promise<BurnoutResponse> {
+  const raw = await redis.get('dr_mod:mod_team').catch(() => null);
+  const now = Date.now();
+  if (!raw) return { mods: [], generatedAt: now };
+  let team: ModTeam;
+  try { team = JSON.parse(raw); } catch { return { mods: [], generatedAt: now }; }
+
+  const entries = Object.entries(team);
+  const teamSize = entries.length;
+  const teamLast7d = entries.reduce((sum, [, r]) => sum + actionsInWindow(r.daily, now, 6, 0), 0);
+
+  const mods: BurnoutMod[] = entries.map(([name, rec]) => {
+    const b = computeBurnout(rec, teamLast7d, teamSize, now);
+    b.name = name;
+    return b;
+  });
+
+  // Highest-risk first so the dashboard's top row is the person to message.
+  mods.sort((a, b) => b.score - a.score);
+
+  return { mods, generatedAt: now };
 }
 
 // --- WEEKLY HEALTH REPORT ---

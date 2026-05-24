@@ -16,6 +16,7 @@ import {
   type SecondOpinionStatus,
   type TeamVitalsResponse,
   type WeeklyReport,
+  type BurnoutResponse,
 } from "../shared/api.ts";
 
 type PowerId =
@@ -27,6 +28,7 @@ type PowerId =
   | "find-mods"
   | "appeal"
   | "report"
+  | "burnout"
   | "settings";
 
 type Power = {
@@ -49,6 +51,7 @@ const ALL_POWERS: Power[] = [
   { id: "find-mods", icon: "🎯", name: "Find Good Moderators", sub: "Scan recent contributors", needsAi: true, actionLabel: "Scan" },
   { id: "appeal", icon: "🗣️", name: "User Appeal Flow", sub: "Re-review AI removals", needsAi: true, actionLabel: "Open" },
   { id: "report", icon: "📊", name: "Weekly Health Report", sub: "7-day team summary", needsAi: false, actionLabel: "View" },
+  { id: "burnout", icon: "🔥", name: "Burnout Watch", sub: "Predicts who's headed for flatline next", needsAi: false, actionLabel: "View" },
   { id: "settings", icon: "🔧", name: "Settings", sub: "Threshold, mode & brain", needsAi: false, actionLabel: "Open" },
 ];
 
@@ -188,6 +191,7 @@ async function handlePower(id: PowerId, btn: HTMLButtonElement): Promise<void> {
       case "find-mods": await runFindMods(); break;
       case "appeal": await runAppeals(); break;
       case "report": await runReport(); break;
+      case "burnout": await runBurnout(); break;
       case "settings": runSettings(); break;
     }
   } catch (err) {
@@ -244,6 +248,35 @@ function vitalRow(m: ModVital): string {
   const dot = m.vital === "ACTIVE" ? "🟢" : m.vital === "IDLE" ? "🟡" : "🔴";
   const checkIn = typeof m.messagedMsAgo === "number" ? ` · checked-in ${formatDuration(m.messagedMsAgo)} ago` : "";
   return `<div class="row">${dot} <b>u/${escapeHtml(m.name)}</b> — last action ${formatDuration(m.lastSeenMs)} ago · ${m.actions} total${escapeHtml(checkIn)}</div>`;
+}
+
+// --- Burnout Watch ---
+// Vitals tells you who's flatlined; Burnout tells you who's headed there next.
+async function runBurnout(): Promise<void> {
+  const res = await fetch(ApiEndpoint.Burnout);
+  const data = (await res.json()) as BurnoutResponse;
+  const intro = `<div class="cr-detail-text">
+    Burnout predicts which moderators are most likely to flatline next so Mod Team Care can reach out before the silence happens. Pure heuristics over the last 30 days of activity — no AI needed.
+  </div>`;
+  if (!data.mods.length) {
+    openDetailHtml("Burnout Watch", intro + `<div class="row cr-muted">No moderator activity recorded yet.</div>`);
+    return;
+  }
+  const rows = data.mods.map(burnoutRow).join("");
+  openDetailHtml("Burnout Watch", intro + rows);
+}
+
+function burnoutRow(m: { name: string; score: number; tier: 'healthy' | 'watching' | 'at-risk'; signals: string[]; last7d: number; prev7d: number; daysIdle: number }): string {
+  const dot = m.tier === 'healthy' ? '🟢' : m.tier === 'watching' ? '🟡' : '🔴';
+  const tierLabel = m.tier === 'at-risk' ? 'AT RISK' : m.tier === 'watching' ? 'Watching' : 'Healthy';
+  const signals = m.signals.length
+    ? `<br/><span class="cr-muted">${m.signals.map(escapeHtml).join(' · ')}</span>`
+    : `<br/><span class="cr-muted">No risk signals — activity looks sustainable.</span>`;
+  return `<div class="row">
+    ${dot} <b>u/${escapeHtml(m.name)}</b> — ${tierLabel} (score ${m.score})
+    <br/><span class="cr-muted">Last 7d: ${m.last7d} actions · Prior 7d: ${m.prev7d} · Idle ${m.daysIdle}d</span>
+    ${signals}
+  </div>`;
 }
 
 // --- Mod Team Care: run the pass, then show what's pending ---
