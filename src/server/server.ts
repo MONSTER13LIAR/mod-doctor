@@ -842,6 +842,59 @@ async function runModCarePass(): Promise<{ messaged: string[]; skipped: string[]
   return { messaged, skipped };
 }
 
+// --- NEW MOD ONBOARDING ---
+// When a new moderator joins the team, send them a guided tour modmail so
+// they know Dr. Mod exists, where the dashboard lives, and what's in it.
+// Idempotent via dr_mod:welcomed:<name> so a remove/re-add never re-spams.
+
+async function sendNewModWelcome(newModName: string): Promise<void> {
+  const subredditName = context.subredditName;
+  if (!subredditName) return;
+
+  const welcomedKey = `dr_mod:welcomed:${newModName.toLowerCase()}`;
+  const already = await redis.get(welcomedKey).catch(() => null);
+  if (already) {
+    console.log(`[DR. Mod] New mod u/${newModName} already welcomed — skipping.`);
+    return;
+  }
+
+  const body = `Hi u/${newModName},
+
+I'm **Dr. Mod** 🩺 — the bot watching over this subreddit's moderator team. Welcome to r/${subredditName}!
+
+**What I do here:**
+• Track the team's "pulse" (the timestamp of the last human mod action). When the team goes quiet, I can stand in as an AI surgeon to keep the sub stable.
+• Watch for moderator burnout, send wellness check-ins, and surface per-mod vitals so nobody silently burns out.
+• Second-opinion individual mod calls if the team opts in.
+
+**Your Control Room:**
+Look for the pinned **Live Monitor** post on r/${subredditName}. As a moderator, you'll see a **🩺 Open Dashboard** button on top of it. Inside the dashboard you'll find 10 powers:
+
+🏥 Crisis Detection · 🤖 AI Surgeon · 🧑‍⚕️ Private Doc (second opinion) · 🩺 Mod Team Vitals · 📬 Mod Team Care · 🎯 Find Good Moderators · 🗣️ User Appeal Flow · 📊 Weekly Health Report · 🔥 Burnout Watch · 🔧 Settings
+
+**If you ever need to step away:**
+No pressure — Mod Team Care will check in via modmail after a week of silence, and the AI surgeon will keep the doors open until you're back.
+
+Take any mod action and you'll start showing up on the team's vitals as 🟢 ACTIVE.
+
+Welcome to the team!
+
+— Dr. Mod`;
+
+  try {
+    await reddit.modMail.createConversation({
+      subredditName,
+      subject: `🩺 Welcome to r/${subredditName}, u/${newModName} — your Dr. Mod tour`,
+      body,
+      to: `u/${newModName}`,
+    });
+    await redis.set(welcomedKey, "1");
+    console.log(`[DR. Mod] Welcomed new mod u/${newModName}.`);
+  } catch (e) {
+    console.warn(`[DR. Mod] Welcome modmail to u/${newModName} failed:`, e);
+  }
+}
+
 // --- BURNOUT WATCH ---
 // Companion to Mod Team Vitals. Vitals report *current* state (ACTIVE / IDLE /
 // FLATLINE); Burnout predicts who is most likely to flatline next so Mod Team
@@ -1380,6 +1433,20 @@ async function onModAction(req: IncomingMessage): Promise<TriggerResponse> {
         console.warn('[DR. Mod] runSecondOpinion threw:', e)
       );
     }
+  }
+
+  // New-mod onboarding. acceptmoderatorinvite = the new mod themselves accepted
+  // an invite (modName IS the new mod). addmoderator = an existing mod added
+  // someone (targetUser.name is the new mod). sendNewModWelcome is idempotent.
+  if (action === "acceptmoderatorinvite" && modName) {
+    await sendNewModWelcome(modName).catch((e) =>
+      console.warn('[DR. Mod] sendNewModWelcome failed:', e)
+    );
+  }
+  if (action === "addmoderator" && payload.targetUser?.name) {
+    await sendNewModWelcome(payload.targetUser.name).catch((e) =>
+      console.warn('[DR. Mod] sendNewModWelcome failed:', e)
+    );
   }
   return {};
 }
