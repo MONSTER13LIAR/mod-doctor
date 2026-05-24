@@ -26,6 +26,9 @@ import {
   type BurnoutMod,
   type BurnoutTier,
   type BurnoutResponse,
+  type SubTempTier,
+  type SubTempDay,
+  type SubTemperatureResponse,
   HEARTBEAT_KEY,
   DEFAULT_CRISIS_THRESHOLD_MS,
   formatDuration,
@@ -61,6 +64,7 @@ const MOD_ONLY_ENDPOINTS = new Set<string>([
   ApiEndpoint.SecondOpinion,
   ApiEndpoint.SaveSecondOpinion,
   ApiEndpoint.Burnout,
+  ApiEndpoint.SubTemperature,
 ]);
 
 async function onRequest(
@@ -176,6 +180,9 @@ async function onRequest(
       break;
     case ApiEndpoint.Burnout:
       body = await onBurnout();
+      break;
+    case ApiEndpoint.SubTemperature:
+      body = await onSubTemperature();
       break;
     case "/internal/scheduled/weekly-report":
       body = await onScheduledWeeklyReport();
@@ -995,6 +1002,150 @@ async function onBurnout(): Promise<BurnoutResponse> {
   return { mods, generatedAt: now };
 }
 
+// --- SUB TEMPERATURE ---
+// Heuristic-only community-mood thermometer. Vitals + Burnout watch the
+// moderators; Sub Temperature watches the community itself. Every new post
+// and comment gets a fast 0-10 toxicity score (no AI call, no quota), the
+// scores are accumulated in per-day buckets, and the dashboard surfaces the
+// last-7-day average as a temperature reading.
+
+const SUB_TEMP_KEY = 'dr_mod:sub_temperature';
+const SUB_TEMP_RETENTION_DAYS = 30;
+
+const NEGATIVE_WORDS = [
+  'hate', 'stupid', 'idiot', 'moron', 'shut up', 'shut-up', 'die', 'awful',
+  'terrible', 'pathetic', 'worthless', 'trash', 'garbage', 'cringe',
+  'disgust', 'loser', 'failure',
+];
+
+function scoreTextToxicity(text: string | undefined): number {
+  if (!text) return 0;
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return 0;
+  let score = 0;
+
+  // Slur or threat → instant high. SLUR_PATTERNS already covers the high-
+  // confidence set used by Private Doc heuristics, so we get the same
+  // bar without duplicating the list.
+  if (hasSlurOrThreat(trimmed)) score += 6;
+
+  // Shouting: high caps ratio on substantial text.
+  if (trimmed.length >= 30) {
+    const letters = trimmed.replace(/[^A-Za-z]/g, '');
+    if (letters.length >= 20) {
+      const caps = letters.replace(/[^A-Z]/g, '').length;
+      const capsRatio = caps / letters.length;
+      if (capsRatio > 0.6) score += 2;
+    }
+  }
+
+  // Anger punctuation. Either a streak of !!! or many ! overall.
+  if (/!{3,}/.test(trimmed)) score += 2;
+  else if ((trimmed.match(/!/g) || []).length >= 5) score += 1;
+
+  // Negativity vocabulary.
+  const lower = trimmed.toLowerCase();
+  let negHits = 0;
+  for (const w of NEGATIVE_WORDS) {
+    if (lower.includes(w)) negHits++;
+  }
+  score += Math.min(negHits, 4);
+
+  // Long rant: lengthy text plus multiple negativity hits.
+  if (trimmed.length > 1000 && negHits >= 3) score += 1;
+
+  return Math.min(score, 10);
+}
+
+type SubTempState = {
+  daily: Record<string, { samples: number; totalScore: number }>;
+};
+
+async function readSubTempState(): Promise<SubTempState> {
+  const raw = await redis.get(SUB_TEMP_KEY).catch(() => null);
+  if (!raw) return { daily: {} };
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && parsed.daily) return parsed as SubTempState;
+  } catch { /* fall through */ }
+  return { daily: {} };
+}
+
+async function recordContentTemperature(text: string | undefined, now: number): Promise<void> {
+  const score = scoreTextToxicity(text);
+  const state = await readSubTempState();
+  const dk = dayKey(now);
+  const bucket = state.daily[dk] || { samples: 0, totalScore: 0 };
+  bucket.samples += 1;
+  bucket.totalScore += score;
+  state.daily[dk] = bucket;
+
+  const cutoff = dayKey(now - SUB_TEMP_RETENTION_DAYS * DAY_MS);
+  for (const k of Object.keys(state.daily)) {
+    if (k < cutoff) delete state.daily[k];
+  }
+
+  await redis.set(SUB_TEMP_KEY, JSON.stringify(state)).catch((e) =>
+    console.warn('[DR. Mod] recordContentTemperature: redis set failed', e)
+  );
+}
+
+function tempTierAndRecommendation(avg: number): { tier: SubTempTier; tempF: number; recommendation: string } {
+  const tempF = Math.round((98.6 + avg * 0.8) * 10) / 10;
+  if (avg < 1.0) return { tier: 'normal', tempF, recommendation: 'Community is healthy. No action needed.' };
+  if (avg < 3.0) return { tier: 'warm', tempF, recommendation: 'Mild elevation. Keep an eye on the modqueue this week.' };
+  if (avg < 5.0) return { tier: 'elevated', tempF, recommendation: 'Above baseline — consider stricter AutoModerator rules or a stickied tone reminder.' };
+  if (avg < 7.0) return { tier: 'fever', tempF, recommendation: 'Sub is running a fever. Consider enabling AI Surgeon (Surrogate mode) for the weekend.' };
+  return { tier: 'high-fever', tempF, recommendation: 'URGENT — high toxicity. Enable Surgeon mode now and rally the mod team.' };
+}
+
+async function onSubTemperature(): Promise<SubTemperatureResponse> {
+  const now = Date.now();
+  const state = await readSubTempState();
+
+  // Build the last 7 days oldest -> newest, padding zero-sample days so the
+  // dashboard can render a clean 7-bar history without gaps.
+  const last7d: SubTempDay[] = [];
+  let weightedScoreSum = 0;
+  let totalSamples = 0;
+  for (let i = 6; i >= 0; i--) {
+    const dk = dayKey(now - i * DAY_MS);
+    const bucket = state.daily[dk];
+    const samples = bucket?.samples ?? 0;
+    const avgScore = samples > 0 ? bucket!.totalScore / samples : 0;
+    last7d.push({ day: dk, avgScore: Math.round(avgScore * 10) / 10, samples });
+    if (samples > 0) {
+      weightedScoreSum += bucket!.totalScore;
+      totalSamples += samples;
+    }
+  }
+
+  const avgScore = totalSamples > 0 ? weightedScoreSum / totalSamples : 0;
+  const { tier, tempF, recommendation } = tempTierAndRecommendation(avgScore);
+
+  // Trend: last 3 days' average vs prior 4 days'. >= 0.5 swing flips the
+  // label off "steady" so the dashboard can flag a worsening week early.
+  const tailSum = last7d.slice(-3).reduce((s, d) => s + d.avgScore * (d.samples > 0 ? 1 : 0), 0);
+  const tailDays = last7d.slice(-3).filter((d) => d.samples > 0).length || 1;
+  const headSum = last7d.slice(0, 4).reduce((s, d) => s + d.avgScore * (d.samples > 0 ? 1 : 0), 0);
+  const headDays = last7d.slice(0, 4).filter((d) => d.samples > 0).length || 1;
+  const recent = tailSum / tailDays;
+  const earlier = headSum / headDays;
+  const delta = recent - earlier;
+  const trend: 'rising' | 'falling' | 'steady' = delta > 0.5 ? 'rising' : delta < -0.5 ? 'falling' : 'steady';
+
+  return {
+    avgScore: Math.round(avgScore * 10) / 10,
+    tempF,
+    tier,
+    trend,
+    totalSamples,
+    last7d,
+    recommendation,
+    generatedAt: now,
+  };
+}
+
 // --- WEEKLY HEALTH REPORT ---
 // Dr. Mod tallies the week's moderation work in plain Redis counters and PMs
 // the owner a summary every Sunday. "broke"/"fixed" are derived by diffing a
@@ -1549,6 +1700,15 @@ async function onRedditPostCreate(req: IncomingMessage): Promise<TriggerResponse
   const authorName = payload.author?.name;
   const postId = payload.post?.id;
 
+  // Sub Temperature: record a toxicity sample on every new post. Cheap
+  // heuristic (no AI call) and fully passive — it never blocks or changes
+  // any downstream flow.
+  const postTitle: string | undefined = payload.post?.title;
+  const postBody: string | undefined = payload.post?.body;
+  await recordContentTemperature(`${postTitle ?? ''}\n${postBody ?? ''}`, Date.now()).catch((e) =>
+    console.warn('[DR. Mod] Sub Temperature record (post) failed:', e)
+  );
+
   console.log(`[DR. Mod] onRedditPostCreate: Status=${status}, Post=${postId}, Author=${authorName}`);
 
   if (status === 'CRISIS') {
@@ -1697,6 +1857,13 @@ async function onCommentCreate(req: IncomingMessage): Promise<TriggerResponse> {
   const body: string = payload.comment?.body || '';
   const postId: string | undefined = payload.comment?.postId || payload.post?.id;
   const commenter: string | undefined = payload.author?.name;
+
+  // Sub Temperature: every comment is a sample. Cheap heuristic, no AI cost.
+  // Runs before the appeal check so we capture toxicity even for non-APPEAL
+  // comments — they're the bulk of the signal.
+  await recordContentTemperature(body, Date.now()).catch((e) =>
+    console.warn('[DR. Mod] Sub Temperature record (comment) failed:', e)
+  );
 
   if (!postId || !commenter) return {};
   if (!/\bappeal\b/i.test(body)) return {};

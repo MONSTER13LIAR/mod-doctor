@@ -17,6 +17,7 @@ import {
   type TeamVitalsResponse,
   type WeeklyReport,
   type BurnoutResponse,
+  type SubTemperatureResponse,
 } from "../shared/api.ts";
 
 type PowerId =
@@ -29,6 +30,7 @@ type PowerId =
   | "appeal"
   | "report"
   | "burnout"
+  | "sub-temp"
   | "settings";
 
 type Power = {
@@ -52,6 +54,7 @@ const ALL_POWERS: Power[] = [
   { id: "appeal", icon: "🗣️", name: "User Appeal Flow", sub: "Re-review AI removals", needsAi: true, actionLabel: "Open" },
   { id: "report", icon: "📊", name: "Weekly Health Report", sub: "7-day team summary", needsAi: false, actionLabel: "View" },
   { id: "burnout", icon: "🔥", name: "Burnout Watch", sub: "Predicts who's headed for flatline next", needsAi: false, actionLabel: "View" },
+  { id: "sub-temp", icon: "🌡️", name: "Sub Temperature", sub: "Is your community running a fever?", needsAi: false, actionLabel: "Check" },
   { id: "settings", icon: "🔧", name: "Settings", sub: "Threshold, mode & brain", needsAi: false, actionLabel: "Open" },
 ];
 
@@ -192,6 +195,7 @@ async function handlePower(id: PowerId, btn: HTMLButtonElement): Promise<void> {
       case "appeal": await runAppeals(); break;
       case "report": await runReport(); break;
       case "burnout": await runBurnout(); break;
+      case "sub-temp": await runSubTemperature(); break;
       case "settings": runSettings(); break;
     }
   } catch (err) {
@@ -277,6 +281,52 @@ function burnoutRow(m: { name: string; score: number; tier: 'healthy' | 'watchin
     <br/><span class="cr-muted">Last 7d: ${m.last7d} actions · Prior 7d: ${m.prev7d} · Idle ${m.daysIdle}d</span>
     ${signals}
   </div>`;
+}
+
+// --- Sub Temperature ---
+// Watches the community itself: every new post and comment gets a fast
+// heuristic toxicity score and the dashboard reports the 7-day reading.
+async function runSubTemperature(): Promise<void> {
+  const res = await fetch(ApiEndpoint.SubTemperature);
+  const data = (await res.json()) as SubTemperatureResponse;
+
+  const tierEmoji =
+    data.tier === 'normal' ? '✅' :
+    data.tier === 'warm' ? '🟡' :
+    data.tier === 'elevated' ? '🟠' :
+    data.tier === 'fever' ? '🔴' : '🚨';
+  const tierLabel =
+    data.tier === 'normal' ? 'Normal' :
+    data.tier === 'warm' ? 'Slightly Warm' :
+    data.tier === 'elevated' ? 'Elevated' :
+    data.tier === 'fever' ? 'Fever' : 'HIGH FEVER';
+  const trendArrow = data.trend === 'rising' ? '↗' : data.trend === 'falling' ? '↘' : '→';
+
+  const intro = `<div class="cr-detail-text">
+    Sub Temperature measures the <b>community</b>'s mood, not the moderators'. Every new post and comment gets a fast heuristic toxicity score (0–10) and we report the rolling 7-day reading. Pure heuristic — no AI calls, no quota cost.
+  </div>`;
+
+  const reading = `<div class="row" style="font-size:1.1em">
+    <b>${tierEmoji} ${data.tempF}°F — ${tierLabel}</b> ${trendArrow} (avg score ${data.avgScore} / 10)
+    <br/><span class="cr-muted">${data.totalSamples} samples over last 7 days · trend ${escapeHtml(data.trend)}</span>
+  </div>`;
+
+  const reco = `<div class="row"><b>🩺 Recommendation:</b> ${escapeHtml(data.recommendation)}</div>`;
+
+  const sparkline = data.last7d.map((d) => {
+    // Bar height scales 0-10 to 6-30px so 0-sample days still show a tiny tick.
+    const h = d.samples > 0 ? Math.max(6, Math.round(d.avgScore * 3)) : 3;
+    const color = d.avgScore < 1 ? '#3aa869' : d.avgScore < 3 ? '#d6b21a' : d.avgScore < 5 ? '#e07b1a' : d.avgScore < 7 ? '#d23f3f' : '#9a0e0e';
+    const label = `${escapeHtml(d.day.slice(5))} · ${d.samples > 0 ? `${d.avgScore.toFixed(1)} (${d.samples})` : 'no data'}`;
+    return `<div style="display:inline-block;width:34px;text-align:center;vertical-align:bottom;margin-right:2px">
+      <div style="height:${h}px;background:${color};margin:0 auto;width:14px;border-radius:2px"></div>
+      <div class="cr-muted" style="font-size:.75em;margin-top:2px">${label}</div>
+    </div>`;
+  }).join('');
+
+  const history = `<div class="row"><b>Last 7 days:</b><br/>${sparkline}</div>`;
+
+  openDetailHtml("Sub Temperature", intro + reading + reco + history);
 }
 
 // --- Mod Team Care: run the pass, then show what's pending ---

@@ -97,6 +97,31 @@ export type BurnoutResponse = {
   generatedAt: number;
 };
 
+// --- Sub Temperature ---
+// Companion to Mod Team Vitals + Burnout: those measure the moderators;
+// this measures the community itself. Pure heuristic toxicity score (0–10)
+// recorded per new post/comment, aggregated per day, then surfaced as a
+// thermometer reading. Higher score = more toxic = the sub is "running a
+// fever" and the team should consider tightening moderation.
+export type SubTempTier = 'normal' | 'warm' | 'elevated' | 'fever' | 'high-fever';
+
+export type SubTempDay = {
+  day: string;        // YYYY-MM-DD
+  avgScore: number;   // 0–10
+  samples: number;
+};
+
+export type SubTemperatureResponse = {
+  avgScore: number;          // last-7-day weighted average, 0–10
+  tempF: number;             // mapped to °F for the thermometer display
+  tier: SubTempTier;
+  trend: 'rising' | 'falling' | 'steady';
+  totalSamples: number;      // last 7 days
+  last7d: SubTempDay[];      // oldest -> newest, padded if a day has no samples
+  recommendation: string;    // one-line action for the team
+  generatedAt: number;
+};
+
 export type TeamVitalsResponse = {
   mods: ModVital[];
 };
@@ -208,6 +233,7 @@ export const ApiEndpoint = {
   SecondOpinion: "/api/second-opinion",
   SaveSecondOpinion: "/api/save-second-opinion",
   Burnout: "/api/burnout",
+  SubTemperature: "/api/sub-temperature",
 } as const;
 
 export type ApiEndpoint = (typeof ApiEndpoint)[keyof typeof ApiEndpoint];
