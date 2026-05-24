@@ -18,9 +18,11 @@ import {
   type WeeklyReport,
   type BurnoutResponse,
   type SubTemperatureResponse,
+  type SubDiagnosis,
 } from "../shared/api.ts";
 
 type PowerId =
+  | "diagnosis"
   | "crisis"
   | "surrogate"
   | "second-opinion"
@@ -45,6 +47,7 @@ type Power = {
 // Order and labels mirror the approved Control Room layout.
 // Second Opinion sits next to AI Surrogate — the "absent mod coverage" + "present mod supervision" pair.
 const ALL_POWERS: Power[] = [
+  { id: "diagnosis", icon: "🩻", name: "Sub Diagnosis", sub: "Overall health score — what's wrong, what to do", needsAi: false, actionLabel: "Diagnose" },
   { id: "crisis", icon: "🏥", name: "Crisis Detection", sub: "How the heartbeat & crisis work", needsAi: false, actionLabel: "View" },
   { id: "surrogate", icon: "🤖", name: "AI Surrogate", sub: "Auto-moderate during downtime", needsAi: true, actionLabel: "Open" },
   { id: "second-opinion", icon: "🧑‍⚕️", name: "Private Doc", sub: "Heuristic + AI review of present mods", needsAi: false, actionLabel: "Open" },
@@ -186,6 +189,7 @@ async function handlePower(id: PowerId, btn: HTMLButtonElement): Promise<void> {
   btn.textContent = "…";
   try {
     switch (id) {
+      case "diagnosis": await runDiagnosis(); break;
       case "crisis": runCrisis(); break;
       case "surrogate": runSurrogate(); break;
       case "second-opinion": await runSecondOpinion(); break;
@@ -205,6 +209,58 @@ async function handlePower(id: PowerId, btn: HTMLButtonElement): Promise<void> {
     btn.disabled = false;
     btn.textContent = original;
   }
+}
+
+// --- Sub Diagnosis (hero tile — executive summary of every other signal) ---
+async function runDiagnosis(): Promise<void> {
+  const res = await fetch(ApiEndpoint.Diagnosis);
+  const data = (await res.json()) as SubDiagnosis;
+
+  const tierEmoji =
+    data.tier === 'healthy' ? '✅' :
+    data.tier === 'stable' ? '🟢' :
+    data.tier === 'concerning' ? '🟡' :
+    data.tier === 'warning' ? '🟠' :
+    '🔴';
+  const tierLabel =
+    data.tier === 'healthy' ? 'HEALTHY' :
+    data.tier === 'stable' ? 'STABLE' :
+    data.tier === 'concerning' ? 'CONCERNING' :
+    data.tier === 'warning' ? 'WARNING' :
+    'CRITICAL';
+  const scoreColor =
+    data.tier === 'healthy' || data.tier === 'stable' ? '#3aa869' :
+    data.tier === 'concerning' ? '#d6b21a' :
+    data.tier === 'warning' ? '#e07b1a' :
+    '#d23f3f';
+
+  const hero = `<div class="row" style="text-align:center;padding:14px 0">
+    <div style="font-size:3.4em;font-weight:700;color:${scoreColor};line-height:1">${data.score}<span style="font-size:.4em;color:#888">/100</span></div>
+    <div style="font-size:1.2em;font-weight:600;margin-top:4px">${tierEmoji} ${tierLabel}</div>
+    <div class="cr-muted" style="margin-top:6px">${escapeHtml(data.headline)}</div>
+  </div>`;
+
+  const components = `<div class="row">
+    <b>Signals at a glance:</b><br/>
+    <span class="cr-muted">
+      Pulse: ${escapeHtml(data.components.crisisStatus)} ·
+      Mods: ${data.components.modsActive}🟢 / ${data.components.modsIdle}🟡 / ${data.components.modsFlatlined}🔴 ·
+      Burnout at-risk: ${data.components.modsBurnoutAtRisk} ·
+      Temp: ${data.components.tempF}°F (${escapeHtml(data.components.tempTier.replace('-', ' '))})
+    </span>
+  </div>`;
+
+  const breakdown = data.deductions.length
+    ? `<div class="row"><b>Where the points went:</b><br/>${
+        data.deductions.map((d) => `<span class="cr-muted">−${d.amount}: ${escapeHtml(d.label)}</span>`).join('<br/>')
+      }</div>`
+    : `<div class="row cr-muted">No deductions — everything is currently within healthy ranges.</div>`;
+
+  const intro = `<div class="cr-detail-text">
+    Sub Diagnosis is the executive summary. Every other tile measures one signal; this rolls pulse, mod vitals, burnout risk, and community temperature into a single 0–100 reading with a one-line headline.
+  </div>`;
+
+  openDetailHtml("Sub Diagnosis", intro + hero + components + breakdown);
 }
 
 // --- Crisis Detection (info) ---

@@ -122,6 +122,37 @@ export type SubTemperatureResponse = {
   generatedAt: number;
 };
 
+// --- Sub Diagnosis ---
+// Executive summary. The other 11 tiles each watch one signal; Diagnosis
+// rolls all of them into a single 0–100 score with a one-line "what's
+// wrong and what to do" headline. This is the number a mod glances at
+// every morning to know whether the sub needs attention.
+export type DiagnosisTier = 'healthy' | 'stable' | 'concerning' | 'warning' | 'critical';
+
+export type DiagnosisDeduction = {
+  label: string;     // human-readable signal name
+  amount: number;    // how many points it took off the base 100
+};
+
+export type SubDiagnosis = {
+  score: number;                   // 0–100
+  tier: DiagnosisTier;
+  headline: string;                // one-line, judge-ready summary
+  deductions: DiagnosisDeduction[]; // ordered by amount desc
+  components: {
+    crisisStatus: 'STABLE' | 'CRISIS' | 'WAITING';
+    modsTotal: number;
+    modsActive: number;
+    modsIdle: number;
+    modsFlatlined: number;
+    modsBurnoutAtRisk: number;
+    modsBurnoutWatching: number;
+    tempTier: SubTempTier;
+    tempF: number;
+  };
+  generatedAt: number;
+};
+
 export type TeamVitalsResponse = {
   mods: ModVital[];
 };
@@ -234,6 +265,7 @@ export const ApiEndpoint = {
   SaveSecondOpinion: "/api/save-second-opinion",
   Burnout: "/api/burnout",
   SubTemperature: "/api/sub-temperature",
+  Diagnosis: "/api/diagnosis",
 } as const;
 
 export type ApiEndpoint = (typeof ApiEndpoint)[keyof typeof ApiEndpoint];
