@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" type="text/css" href="splash.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dr. Mod Control Room</title>
+  </head>
+  <body class="app">
+    <div class="control-room">
+      <header class="cr-header">
+        <div class="cr-title">
+          <span class="cr-emoji">🩺</span>
+          <span>DR. MOD <span class="cr-title-muted">/ CONTROL ROOM</span></span>
+        </div>
+        <div id="status-pill" class="status-pill stable">STABLE</div>
+      </header>
+
+      <div class="cr-pulse">
+        <span class="cr-pulse-label">Last human pulse</span>
+        <span id="heartbeat-value" class="cr-pulse-value">--</span>
+      </div>
+
+      <section id="setup-card" class="cr-card">
+        <div class="cr-card-title">SETUP</div>
+        <ul id="checklist" class="cr-checklist">
+          <li class="cr-skel">Loading…</li>
+        </ul>
+      </section>
+
+      <section class="cr-card">
+        <div class="cr-card-title">POWERS</div>
+        <ul id="powers-list" class="cr-powers">
+          <li class="cr-skel">Loading…</li>
+        </ul>
+      </section>
+
+      <section id="detail-panel" class="cr-card cr-detail hidden">
+        <div class="cr-detail-header">
+          <span id="detail-title" class="cr-card-title">Detail</span>
+          <button id="detail-close" class="cr-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <div id="detail-body" class="cr-detail-body">Loading…</div>
+      </section>
+
+      <footer class="cr-footer">
+        <span id="footer-version">DR. MOD</span>
+        <span class="cr-footer-sep">·</span>
+        <span id="footer-user">—</span>
+      </footer>
+    </div>
+    <script type="module" src="splash.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+node_modules
+.DS_Store
+dist
+.env
+.env.*
+*.log
+public/*.js
+public/*.js.map
+public/chunk-*
+
+# Internal docs / notes — not for publication
+CLAUDE.md

@@ -1,0 +1,356 @@
+:root {
+  --hb-bg: #06080b;
+  --hb-bg-elev: #0c1117;
+  --hb-grid: rgba(110, 231, 167, 0.06);
+  --hb-text: #d7dde6;
+  --hb-text-muted: #6f7a89;
+  --hb-text-dim: #4a5462;
+  --hb-stable: #6ee7a7;
+  --hb-crisis: #f06b6b;
+  --hb-waiting: #f5b53d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.hb-app {
+  margin: 0;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(110, 231, 167, 0.08), transparent 60%),
+    var(--hb-bg);
+  color: var(--hb-text);
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font-size: 13px;
+  min-height: 100vh;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.hb-monitor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.hb-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--hb-text-muted);
+  padding-bottom: 18px;
+}
+
+.hb-mark {
+  color: var(--hb-text);
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.hb-sep {
+  color: var(--hb-text-dim);
+}
+
+.hb-sub {
+  color: var(--hb-text);
+  letter-spacing: 0.8px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hb-status {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.hb-status.stable { color: var(--hb-stable); }
+.hb-status.crisis { color: var(--hb-crisis); animation: hb-flash 1.2s ease-in-out infinite; }
+.hb-status.waiting { color: var(--hb-waiting); }
+
+@keyframes hb-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.hb-ecg {
+  flex: 1;
+  position: relative;
+  background:
+    repeating-linear-gradient(0deg, var(--hb-grid) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, var(--hb-grid) 0 1px, transparent 1px 28px),
+    var(--hb-bg-elev);
+  border: 1px solid rgba(110, 231, 167, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 220px;
+  margin-bottom: 18px;
+}
+
+.hb-ecg-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--hb-stable);
+}
+
+.hb-app.crisis .hb-ecg-svg { color: var(--hb-crisis); }
+.hb-app.waiting .hb-ecg-svg { color: var(--hb-waiting); }
+
+.hb-baseline {
+  stroke: rgba(110, 231, 167, 0.12);
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+}
+
+.hb-trace-bg {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.18;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.hb-trace {
+  fill: none;
+  stroke: url(#hb-trail);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+.hb-cursor {
+  fill: currentColor;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+.hb-readout {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 2fr;
+  gap: 14px;
+  padding-bottom: 14px;
+}
+
+.hb-readout-block {
+  background: var(--hb-bg-elev);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hb-readout-label {
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  color: var(--hb-text-muted);
+  text-transform: uppercase;
+}
+
+.hb-readout-value {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--hb-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hb-bpm {
+  color: var(--hb-stable);
+  letter-spacing: 1px;
+}
+
+.hb-app.crisis .hb-bpm { color: var(--hb-crisis); }
+.hb-app.waiting .hb-bpm { color: var(--hb-waiting); }
+
+.hb-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--hb-text-muted);
+  letter-spacing: 0.4px;
+}
+
+.hb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hb-stable);
+  box-shadow: 0 0 8px currentColor;
+  animation: hb-blink 1.6s ease-in-out infinite;
+}
+
+.hb-app.crisis .hb-dot { background: var(--hb-crisis); }
+.hb-app.waiting .hb-dot { background: var(--hb-waiting); }
+
+@keyframes hb-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (max-width: 520px) {
+  .hb-monitor { padding: 16px 14px 18px; }
+  .hb-readout { grid-template-columns: 1fr 1fr; }
+  .hb-readout-value { font-size: 18px; }
+  .hb-ecg { min-height: 180px; }
+}
+
+/* --- Dashboard overlay (pops over the live monitor when a mod opens it) --- */
+
+.hb-dash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  background: rgba(4, 6, 9, 0.92);
+  display: none;
+}
+
+/* heartbeat.ts toggles .is-open to show/hide the dashboard overlay. */
+.hb-dash-overlay.is-open {
+  display: block;
+}
+
+.hb-dash-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  overflow-y: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+.hb-dash-panel .control-room {
+  background: #11161d;
+  border: 1px solid #2a323d;
+  border-radius: 14px;
+  padding: 16px 16px 22px;
+  margin: 0 auto;
+  max-width: 720px;
+  width: 100%;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+}
+
+.hb-dash-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(20, 24, 30, 0.95);
+  color: #d7dde6;
+  font-size: 16px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.hb-dash-close:hover {
+  background: rgba(40, 46, 56, 0.95);
+}
+
+/* Mod-only "Open Dashboard" button shown inside the heartbeat post. Hidden by
+ * default; heartbeat.ts unhides it after confirming moderator status. */
+.hb-dash-launcher {
+  display: none;
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px 12px 14px;
+  background: linear-gradient(140deg, #7df2b3 0%, #54d28d 55%, #3fc47d 100%);
+  color: #052012;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  box-shadow:
+    0 10px 28px rgba(63, 196, 125, 0.42),
+    0 2px 6px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+  -webkit-tap-highlight-color: transparent;
+  animation: hb-launch-breathe 3.4s ease-in-out infinite;
+}
+
+.hb-dash-launcher.is-visible {
+  display: inline-flex;
+}
+
+/* Pulsing "live" dot to echo the heartbeat monitor. */
+.hb-launcher-pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #052012;
+  flex-shrink: 0;
+  animation: hb-launch-ping 1.8s ease-out infinite;
+}
+
+.hb-launcher-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+@keyframes hb-launch-ping {
+  0% { box-shadow: 0 0 0 0 rgba(5, 32, 18, 0.5); }
+  70% { box-shadow: 0 0 0 7px rgba(5, 32, 18, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(5, 32, 18, 0); }
+}
+
+@keyframes hb-launch-breathe {
+  0%, 100% { box-shadow: 0 10px 28px rgba(63, 196, 125, 0.42), 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.55); }
+  50% { box-shadow: 0 12px 34px rgba(63, 196, 125, 0.62), 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.55); }
+}
+
+.hb-dash-launcher:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.03);
+  box-shadow:
+    0 16px 36px rgba(63, 196, 125, 0.55),
+    0 3px 8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.hb-dash-launcher:active {
+  transform: translateY(0);
+  box-shadow:
+    0 5px 16px rgba(63, 196, 125, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+@media (max-width: 520px) {
+  .hb-dash-launcher { right: 12px; bottom: 12px; padding: 11px 15px 11px 12px; font-size: 12px; }
+}

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" type="text/css" href="heartbeat.css" />
+    <link rel="stylesheet" type="text/css" href="splash.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mod-Doctor Live Monitor</title>
+  </head>
+  <body class="hb-app">
+    <main class="hb-monitor">
+      <header class="hb-head">
+        <span class="hb-mark">DR. MOD</span>
+        <span class="hb-sep">/</span>
+        <span class="hb-sub" id="hb-sub">—</span>
+        <span id="hb-status" class="hb-status stable">STABLE</span>
+      </header>
+
+      <section class="hb-ecg">
+        <svg
+          class="hb-ecg-svg"
+          viewBox="0 0 1000 200"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="hb-trail" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stop-color="currentColor" stop-opacity="0" />
+              <stop offset="60%" stop-color="currentColor" stop-opacity="0.45" />
+              <stop offset="100%" stop-color="currentColor" stop-opacity="1" />
+            </linearGradient>
+          </defs>
+          <line class="hb-baseline" x1="0" y1="100" x2="1000" y2="100" />
+          <path id="hb-trace-bg" class="hb-trace-bg" />
+          <path id="hb-trace" class="hb-trace" />
+          <circle id="hb-cursor" class="hb-cursor" cy="100" r="5" />
+        </svg>
+      </section>
+
+      <section class="hb-readout">
+        <div class="hb-readout-block">
+          <span class="hb-readout-label">BPM</span>
+          <span id="hb-bpm" class="hb-readout-value hb-bpm">—</span>
+        </div>
+        <div class="hb-readout-block">
+          <span class="hb-readout-label">LAST HUMAN PULSE</span>
+          <span id="hb-last" class="hb-readout-value">—</span>
+        </div>
+      </section>
+
+      <footer class="hb-foot">
+        <span class="hb-dot" aria-hidden="true"></span>
+        <span id="hb-foot-text">Monitoring moderator activity in real time.</span>
+      </footer>
+    </main>
+
+    <button id="hb-dash-launcher" class="hb-dash-launcher" type="button">
+      <span class="hb-launcher-pulse" aria-hidden="true"></span>
+      <span class="hb-launcher-icon" aria-hidden="true">🩺</span>
+      <span>Open Dashboard</span>
+    </button>
+
+    <div id="hb-dash-overlay" class="hb-dash-overlay" aria-hidden="true">
+      <div class="hb-dash-scrim" id="hb-dash-scrim"></div>
+      <div class="hb-dash-panel" role="dialog" aria-modal="true" aria-label="DR. Mod Control Room">
+        <button
+          id="hb-dash-close"
+          class="hb-dash-close"
+          type="button"
+          aria-label="Close dashboard"
+        >✕</button>
+        <div class="control-room">
+          <header class="cr-header">
+            <div class="cr-title">
+              <span class="cr-emoji">🩺</span>
+              <span>DR. MOD <span class="cr-title-muted">/ CONTROL ROOM</span></span>
+            </div>
+            <div id="status-pill" class="status-pill stable">STABLE</div>
+          </header>
+
+          <div class="cr-pulse">
+            <span class="cr-pulse-label">Last human pulse</span>
+            <span id="heartbeat-value" class="cr-pulse-value">--</span>
+          </div>
+
+          <section id="setup-card" class="cr-card">
+            <div class="cr-card-title">SETUP</div>
+            <ul id="checklist" class="cr-checklist">
+              <li class="cr-skel">Loading…</li>
+            </ul>
+          </section>
+
+          <section class="cr-card">
+            <div class="cr-card-title">POWERS</div>
+            <ul id="powers-list" class="cr-powers">
+              <li class="cr-skel">Loading…</li>
+            </ul>
+          </section>
+
+          <section id="detail-panel" class="cr-card cr-detail hidden">
+            <div class="cr-detail-header">
+              <span id="detail-title" class="cr-card-title">Detail</span>
+              <button id="detail-close" class="cr-close" type="button" aria-label="Close">✕</button>
+            </div>
+            <div id="detail-body" class="cr-detail-body">Loading…</div>
+          </section>
+
+          <footer class="cr-footer">
+            <span id="footer-version">DR. MOD</span>
+            <span class="cr-footer-sep">·</span>
+            <span id="footer-user">—</span>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="heartbeat.js" defer></script>
+  </body>
+</html>

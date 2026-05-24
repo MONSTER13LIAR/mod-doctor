@@ -1,0 +1,408 @@
+:root {
+  --bg: #07090c;
+  --bg-elev: #0e1218;
+  --bg-card: #11161d;
+  --border: #1d242d;
+  --border-strong: #2a323d;
+  --text: #d7dde6;
+  --text-muted: #8b96a5;
+  --text-dim: #5d6878;
+  --accent: #6ee7a7;
+  --warn: #f5b53d;
+  --danger: #f06b6b;
+  --ai: #b990ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.app {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  min-height: 100vh;
+}
+
+.control-room {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 14px 28px;
+}
+
+.cr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.cr-title {
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cr-emoji {
+  font-size: 18px;
+}
+
+.cr-title-muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+}
+
+.status-pill.stable { color: var(--accent); border-color: rgba(110, 231, 167, 0.4); }
+.status-pill.crisis { color: var(--danger); border-color: rgba(240, 107, 107, 0.55); background: rgba(240, 107, 107, 0.08); }
+.status-pill.waiting { color: var(--warn); border-color: rgba(245, 181, 61, 0.45); }
+
+.cr-pulse {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 4px 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+
+.cr-pulse-label {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cr-pulse-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cr-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 14px 10px;
+  margin-bottom: 12px;
+}
+
+.cr-card-title {
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.cr-checklist,
+.cr-powers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cr-checklist li,
+.cr-powers li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 6px;
+  border-top: 1px solid var(--border);
+}
+
+.cr-checklist li:first-child,
+.cr-powers li:first-child {
+  border-top: 0;
+}
+
+.cr-check-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.cr-check-icon.done {
+  background: rgba(110, 231, 167, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(110, 231, 167, 0.45);
+}
+
+.cr-check-icon.pending {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border-strong);
+}
+
+.cr-check-label {
+  flex: 1;
+  color: var(--text);
+}
+
+.cr-check-label.done {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-dim);
+}
+
+.cr-check-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 4px;
+}
+
+.cr-power-icon {
+  font-size: 16px;
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.cr-power-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cr-power-name {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.cr-power-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cr-power-tag {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+}
+
+.cr-power-tag.ai {
+  color: var(--ai);
+  border-color: rgba(185, 144, 255, 0.45);
+}
+
+.cr-action {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: filter 0.12s ease, transform 0.12s ease;
+}
+
+.cr-action:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.cr-action:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.cr-action.secondary {
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+
+.cr-action.warn {
+  background: var(--warn);
+  color: var(--bg);
+}
+
+.cr-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.cr-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.cr-close {
+  font: inherit;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cr-close:hover {
+  color: var(--text);
+  background: var(--bg-elev);
+}
+
+.cr-detail-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.cr-detail-body .row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.cr-detail-body .row:first-child {
+  border-top: 0;
+}
+
+.cr-skel {
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 8px 6px;
+}
+
+.cr-footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding-top: 14px;
+}
+
+.cr-footer-sep {
+  margin: 0 6px;
+  color: var(--border-strong);
+}
+
+.cr-power-tag.free {
+  color: var(--text-dim);
+  border-color: var(--border-strong);
+}
+
+.cr-detail-text {
+  line-height: 1.55;
+  padding: 4px 0 8px;
+}
+
+.cr-muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Stat grids used by Crisis Detection and the Weekly Health Report. */
+.cr-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+
+.cr-stat {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cr-stat-num {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.cr-stat-num.status-stable { color: var(--accent); }
+.cr-stat-num.status-crisis { color: var(--danger); }
+.cr-stat-num.status-waiting { color: var(--warn); }
+
+.cr-stat-cap {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Appeal rows + inline mini action buttons (also reused by Settings). */
+.cr-appeal {
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 4px;
+}
+
+.cr-appeal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cr-mini {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.cr-mini:hover:not(:disabled) { background: var(--border); }
+.cr-mini:disabled { opacity: 0.5; cursor: not-allowed; }
+.cr-mini.warn { color: var(--warn); border-color: rgba(245, 181, 61, 0.45); }
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 480px) {
+  .control-room { padding: 12px 10px 24px; }
+  .cr-title { font-size: 14px; }
+  .cr-power-tag { display: none; }
+}

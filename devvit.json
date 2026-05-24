@@ -1,0 +1,120 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "mod-doctor",
+  "post": {
+    "dir": "public",
+    "entrypoints": {
+      "default": {
+        "inline": true,
+        "entry": "heartbeat.html"
+      },
+      "dashboard": {
+        "inline": true,
+        "entry": "splash.html"
+      }
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.js"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "DR. Mod: Dashboard",
+        "description": "View Subreddit Vital Signs",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-create"
+      },
+      {
+        "label": "DR. Mod: Dashboard",
+        "description": "Pop the Control Room over the Live Monitor",
+        "location": "post",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-create"
+      },
+      {
+        "label": "DR. Mod: Find New Moderators",
+        "description": "Search for high-quality candidates",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/headhunter"
+      },
+      {
+        "label": "DR. Mod: Probe AI Domains",
+        "description": "Test which AI endpoints are reachable from this app",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/probe-domains"
+      },
+      {
+        "label": "DR. Mod: Reset Brain",
+        "description": "Clear the stored AI key so the setup form re-appears",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/reset-brain"
+      },
+      {
+        "label": "DR. Mod: Mod Care Now",
+        "description": "Send wellness check-ins to flatlined mods right now",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/mod-care-now"
+      },
+      {
+        "label": "DR. Mod: Weekly Report Now",
+        "description": "Fire the weekly health report immediately (don't wait for Sunday)",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/weekly-report-now"
+      }
+    ]
+  },
+  "scheduler": {
+    "tasks": {
+      "modCare": {
+        "endpoint": "/internal/scheduled/mod-care",
+        "cron": "0 */6 * * *"
+      },
+      "weeklyReport": {
+        "endpoint": "/internal/scheduled/weekly-report",
+        "cron": "0 12 * * 0"
+      }
+    }
+  },
+  "triggers": {
+    "onAppInstall": "/internal/on-app-install",
+    "onModAction": "/internal/on-mod-action",
+    "onPostCreate": "/internal/on-post-create",
+    "onCommentCreate": "/internal/on-comment-create"
+  },
+  "forms": {
+    "brainSetup": "/internal/form-resolve"
+  },
+  "permissions": {
+    "http": {
+      "enable": true,
+      "domains": [
+        "api.openai.com",
+        "generativelanguage.googleapis.com",
+        "api.mistral.ai",
+        "api.fireworks.ai",
+        "api.deepinfra.com",
+        "api.replicate.com",
+        "api.x.ai",
+        "inference.ai.azure.com",
+        "bedrock-runtime.us-east-1.amazonaws.com",
+        "discord.com",
+        "api.deepseek.com"
+      ]
+    }
+  },
+  "scripts": {
+    "dev": "node --experimental-strip-types ./tools/build.ts --watch",
+    "build": "node --experimental-strip-types ./tools/build.ts --minify"
+  },
+  "dev": {
+    "subreddit": "mod_doctor_dev"
+  }
+}
