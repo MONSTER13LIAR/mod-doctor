@@ -14,23 +14,26 @@ It's framed as *team wellness*, never surveillance. The judges are mods themselv
 
 ---
 
-## What it does — 9 powers
+## What it does — 12 powers
 
 The Control Room dashboard (mod-only) surfaces every capability as a tile:
 
 | | Power | What it does |
 |---|---|---|
+| 🩻 | **Sub Diagnosis** | Hero tile: 0–100 health score + one-line diagnosis headline. |
 | 🏥 | **Crisis Detection** | Tracks time since the last human mod action. Pulse goes flat → sub enters CRISIS. |
-| 🤖 | **AI Surgeon (Surrogate)** | During CRISIS, AI auto-moderates new posts (or just flags them, in Assistant mode). Safe defaults: unreachable AI rejects in Surrogate mode, filters in Assistant mode. |
-| 🧑‍⚕️ | **Private Doc** | A second opinion on every mod removal/approval. Heuristics first; ambiguous calls escalate to AI. Nurse mode = modmail flags only; Surgeon mode = auto-corrects clear bad calls. Default off. |
+| 🤖 | **AI Surgeon (Surrogate)** | During CRISIS, AI auto-moderates new posts. |
+| 🧑‍⚕️ | **Private Doc** | Review of present mod actions + AI **Auto-Rule Doctor** suggestions. |
 | 🩺 | **Mod Team Vitals** | Per-mod health: who's active, who's idle, who's flatlined. |
-| 📬 | **Mod Team Care** | Auto-modmail flatlined mods with a check-in. Cooldown-aware so it never pesters. |
+| 📬 | **Mod Team Care** | Auto-modmail flatlined mods with a check-in. |
 | 🎯 | **Find Good Moderators** | AI ranks recent subreddit contributors as mod candidates. |
-| 🗣️ | **User Appeal Flow** | When the AI removes a post, the author can reply `APPEAL` — Dr. Mod re-reviews and either restores it or upholds with a reason. |
-| 📊 | **Weekly Health Report** | Sunday cron: 7-day team summary, plus a broke/fixed diff from a Monday snapshot. |
-| 🔧 | **Settings** | Crisis threshold, AI mode, brain (Gemini key) config. |
+| 🗣️ | **User Appeal Flow** | User appeals for AI removals directly to the mod team. |
+| 📊 | **Weekly Health Report** | Sunday summary of team activity and community growth. |
+| 🔥 | **Burnout Watch** | Predictive heuristics to catch mod exhaustion before they flatline. |
+| 🌡️ | **Sub Temperature** | Community toxicity thermometer with trend analysis. |
+| 🔧 | **Settings** | Thresholds, AI modes, and "Succession Planning" recruiter config. |
 
-The Live Monitor (public, pinned) is a separate webview that shows the animated pulse line and the current status (STABLE / CRISIS / WAITING). Mods see a "🩺 Open Dashboard" launcher on top of it.
+The Live Monitor (public, pinned) is a separate webview that shows the animated pulse line, current status, and the **Sub Diagnosis** score. Mods see a "🩺 Open Dashboard" launcher on top of it.
 
 ---
 
