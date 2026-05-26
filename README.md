@@ -14,7 +14,7 @@ It's framed as *team wellness*, never surveillance. The judges are mods themselv
 
 ---
 
-## What it does — 12 powers
+## What it does — 13 powers
 
 The Control Room dashboard (mod-only) surfaces every capability as a tile:
 
@@ -31,6 +31,7 @@ The Control Room dashboard (mod-only) surfaces every capability as a tile:
 | 📊 | **Weekly Health Report** | Sunday summary of team activity and community growth. |
 | 🔥 | **Burnout Watch** | Predictive heuristics to catch mod exhaustion before they flatline. |
 | 🌡️ | **Sub Temperature** | Community toxicity thermometer with trend analysis. |
+| 👩‍⚕️ | **Triage Nurse** | AI-powered modmail categorization with private mod-notes. |
 | 🔧 | **Settings** | Thresholds, AI modes, and "Succession Planning" recruiter config. |
 
 The Live Monitor (public, pinned) is a separate webview that shows the animated pulse line, current status, and the **Sub Diagnosis** score. Mods see a "🩺 Open Dashboard" launcher on top of it.
