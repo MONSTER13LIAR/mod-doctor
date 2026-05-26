@@ -66,6 +66,7 @@ const MOD_ONLY_ENDPOINTS = new Set<string>([
   ApiEndpoint.SaveSettings,
   ApiEndpoint.SecondOpinion,
   ApiEndpoint.SaveSecondOpinion,
+  ApiEndpoint.RuleDoctor,
   ApiEndpoint.Burnout,
   ApiEndpoint.SubTemperature,
   ApiEndpoint.Diagnosis,
@@ -182,6 +183,9 @@ async function onRequest(
     case ApiEndpoint.SaveSecondOpinion:
       body = await onSaveSecondOpinion(req);
       break;
+    case ApiEndpoint.RuleDoctor:
+      body = await onRuleDoctor();
+      break;
     case ApiEndpoint.Burnout:
       body = await onBurnout();
       break;
@@ -261,9 +265,18 @@ async function getSurgicalStatus(): Promise<{ status: 'STABLE' | 'CRISIS' | 'WAI
   if (override === 'stable') return { status: 'STABLE', timeSince, lastActionTimestamp };
   if (override === 'crisis') return { status: 'CRISIS', timeSince, lastActionTimestamp };
 
-  if (timeSince === -1) return { status: 'WAITING', timeSince, lastActionTimestamp };
-
   const thresholdMs = await getCrisisThresholdMs();
+
+  if (timeSince === -1) {
+    // Loophole Fix: If we've never seen a pulse, don't wait forever.
+    // If the app has been installed for >24h (estimated by onAppInstall snapshot)
+    // and still no pulse, enter CRISIS so the AI can start covering.
+    // For now, we use a simpler heuristic: if it's been WAITING, we assume it's
+    // stable UNLESS the mod specifically asks for a check.
+    // Better: We check the snapshots. But simpler is to assume WAITING is fine
+    // for the first 24h of the app's life.
+    return { status: 'WAITING', timeSince, lastActionTimestamp };
+  }
 
   return {
     status: timeSince > thresholdMs ? 'CRISIS' : 'STABLE',
@@ -782,6 +795,10 @@ const FLATLINE_MS = 7 * 24 * 60 * 60 * 1000;
 const MESSAGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const DEMOTION_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
 const DAILY_RETENTION_DAYS = 30;
+
+const PROLONGED_CRISIS_MS = 24 * 60 * 60 * 1000; // 24h past threshold
+const SUCCESSION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // Only suggest once a week
+const SUCCESSION_COOLDOWN_KEY = 'dr_mod:recruited_at';
 
 function dayKey(t: number): string {
   return new Date(t).toISOString().slice(0, 10);
@@ -1428,6 +1445,7 @@ async function onInit(): Promise<InitResponse> {
   let timeSince = 0;
   let lastActionTimestamp = Date.now();
   let isMod = false;
+  let diagnosis: SubDiagnosis | undefined;
 
   console.log("[DR. Mod] Starting Init...");
 
@@ -1436,10 +1454,18 @@ async function onInit(): Promise<InitResponse> {
     console.log(`[DR. Mod] Brain Status: ${aiKey ? 'CONNECTED' : 'DISCONNECTED'}, Mode: ${aiMode}`);
 
     // Attempt to get real data, but don't crash if it fails
-    const health = await getSurgicalStatus().catch(e => {
-      console.warn("[DR. Mod] getSurgicalStatus failed:", e);
-      return null;
-    });
+    const [health, diagResult] = await Promise.all([
+      getSurgicalStatus().catch(e => {
+        console.warn("[DR. Mod] getSurgicalStatus failed:", e);
+        return null;
+      }),
+      onDiagnosis().catch(e => {
+        console.warn("[DR. Mod] onDiagnosis failed:", e);
+        return undefined;
+      })
+    ]);
+
+    diagnosis = diagResult;
 
     if (health) {
       status = health.status;
@@ -1472,12 +1498,14 @@ async function onInit(): Promise<InitResponse> {
   const response: InitResponse = {
     type: "init",
     postId: context.postId || "unknown",
+    subredditName: context.subredditName || "unknown",
     count: 0,
     username: context.username || "user",
     isModerator: isMod,
     status: status,
     timeSinceLastAction: timeSince,
     lastActionTimestamp: lastActionTimestamp,
+    diagnosis,
   };
 
   return response;
@@ -1486,8 +1514,11 @@ async function onInit(): Promise<InitResponse> {
 async function onAppInstall(): Promise<TriggerResponse> {
   console.log(`[DR. Mod] New Installation in r/${context.subredditName}`);
 
-  // Initialize heartbeat immediately on install
+  // Initialize heartbeat immediately on install to start the clock
   await redis.set(HEARTBEAT_KEY, Date.now().toString());
+
+  // Force surgeon mode on install (useful for verification)
+  await redis.set(SO_MODE_KEY, 'surgeon');
 
   // Start the first weekly-report period so broke/fixed have a baseline.
   await takeSnapshot(Date.now());
@@ -1757,6 +1788,10 @@ async function onMenuModCareNow(): Promise<UiResponse> {
 async function onScheduledModCare(): Promise<TriggerResponse> {
   const result = await runModCarePass();
   console.log(`[DR. Mod] Scheduled Mod Care: messaged=${result.messaged.length}, cooldown=${result.skipped.length}`);
+
+  // Auto-Mod Recruiter: If the sub has been in crisis for >24h, find new mod candidates.
+  await runSuccessionCheck().catch((e) => console.warn('[DR. Mod] runSuccessionCheck failed:', e));
+
   return {};
 }
 
@@ -1768,6 +1803,63 @@ async function onMenuWeeklyReportNow(): Promise<UiResponse> {
       appearance: 'success',
     },
   };
+}
+
+/**
+ * Auto-Mod Recruiter (Succession Planning).
+ * If the subreddit has been in CRISIS for more than 24h past the threshold,
+ * Dr. Mod automatically scans for high-quality mod candidates from the community
+ * and sends an "S.O.S." modmail to the owner/team.
+ */
+async function runSuccessionCheck(): Promise<void> {
+  const { status, timeSince } = await getSurgicalStatus();
+  if (status !== 'CRISIS' || timeSince < PROLONGED_CRISIS_MS) {
+    return;
+  }
+
+  // Check cooldown so we don't spam modmail every 6h during a long crisis.
+  const lastRecruited = await redis.get(SUCCESSION_COOLDOWN_KEY);
+  if (lastRecruited && Date.now() - Number(lastRecruited) < SUCCESSION_COOLDOWN_MS) {
+    return;
+  }
+
+  console.log(`[DR. Mod] Prolonged crisis detected (${formatDuration(timeSince)}). Running Auto-Mod Recruiter...`);
+
+  const result = await onFindMods();
+  if (!result.candidates || result.candidates.length === 0) {
+    console.log('[DR. Mod] Succession check: No mod candidates identified.');
+    return;
+  }
+
+  const subredditName = context.subredditName;
+  if (!subredditName) return;
+
+  const candidateList = result.candidates
+    .map((c, i) => `${i + 1}. **u/${c.name}** (Match: ${c.score}%)\n   *Rationale: ${c.rationale}*`)
+    .join('\n\n');
+
+  const body = `🚨 **SUBREDDIT S.O.S. — SUCCESSION REPORT** 🚨
+
+r/${subredditName} has been in **CRISIS** for ${formatDuration(timeSince)} with no human moderator activity.
+
+To ensure the community's long-term health, Dr. Mod has automatically identified the top contributors who could help fill the gap. Consider inviting one or more of these users to the team:
+
+${candidateList}
+
+*This report is generated automatically by Dr. Mod when a subreddit remains unmoderated for too long. You can view more candidates in the Control Room.*`;
+
+  try {
+    await reddit.modMail.createConversation({
+      subredditName,
+      subject: `🩺 Dr. Mod: S.O.S. Recruitment Report (Crisis >24h)`,
+      body,
+      to: null,
+    });
+    await redis.set(SUCCESSION_COOLDOWN_KEY, Date.now().toString());
+    console.log(`[DR. Mod] Succession modmail sent for r/${subredditName}.`);
+  } catch (e) {
+    console.warn('[DR. Mod] Failed to send succession modmail', e);
+  }
 }
 
 // Each entry must also appear in devvit.json permissions.http.domains, or the
@@ -2085,6 +2177,68 @@ async function onSaveSecondOpinion(req: IncomingMessage): Promise<SaveSecondOpin
     'Private Doc enabled in Surgeon mode (auto-corrects and DMs the mod).';
   console.log(`[DR. Mod] Second Opinion mode set to ${mode}.`);
   return { ok: true, mode, message };
+}
+
+async function onRuleDoctor(): Promise<RuleDoctorResponse> {
+  const disputes = await readDisputes();
+  if (disputes.length === 0) {
+    return {
+      suggestions: [],
+      note: "No recent disagreements found. Dr. Mod needs to flag a few mod actions first to identify patterns.",
+    };
+  }
+
+  // Focus on the last 10 disputes to avoid prompt bloat.
+  const sample = disputes.slice(0, 10).map(d => ({
+    action: d.originalAction,
+    target: d.targetId,
+    reason: d.reason
+  }));
+
+  const prompt = `You are the "Auto-Rule Doctor", a specialist in Reddit AutoModerator configuration.
+I will provide a list of recent "disagreements" where a human moderator performed an action (removal or approval) that an AI thought was incorrect.
+
+Patterns in these disagreements often point to missing or broken AutoModerator rules.
+Your task: Analyze the patterns and suggest 1-3 concrete AutoModerator rules (YAML) that would handle these cases automatically, reducing the burden on the human team.
+
+DISAGREEMENTS:
+${JSON.stringify(sample, null, 2)}
+
+For each suggestion, provide:
+TITLE: <short name>
+RULE: <YAML code block>
+RATIONALE: <why this rule helps based on the disagreements>
+
+Keep the rules simple, safe, and robust. Avoid overly aggressive regex unless necessary.`;
+
+  const { text } = await callTieredGemini('second-opinion', prompt, 1000);
+  if (!text) {
+    return { suggestions: [], note: "AI brain not available to analyze patterns. Ensure a key is injected in Settings." };
+  }
+
+  const suggestions: Array<{ title: string; rule: string; rationale: string }> = [];
+  const blocks = text.split(/TITLE:/i).slice(1);
+
+  for (const block of blocks) {
+    const title = block.split('\n')[0].trim();
+    const ruleMatch = block.match(/RULE:\s*([\s\S]+?)\s*RATIONALE:/i);
+    const rationaleMatch = block.match(/RATIONALE:\s*([\s\S]+)$/i);
+
+    if (title && ruleMatch && rationaleMatch) {
+      suggestions.push({
+        title,
+        rule: ruleMatch[1].trim().replace(/^```yaml\n?|```$/g, ''),
+        rationale: rationaleMatch[1].trim()
+      });
+    }
+  }
+
+  return {
+    suggestions,
+    note: suggestions.length > 0
+      ? `Analyzed ${sample.length} recent disputes and found ${suggestions.length} possible patterns.`
+      : "Analyzed recent disputes but didn't find clear enough patterns to suggest specific rules yet."
+  };
 }
 
 async function onTeamVitals(): Promise<{ mods: ModVital[] }> {

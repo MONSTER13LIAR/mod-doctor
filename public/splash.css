@@ -367,6 +367,97 @@ body.app {
   color: var(--text-muted);
 }
 
+/* --- Diagnosis Hero --- */
+.cr-diagnosis-hero {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.cr-diagnosis-hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--accent);
+}
+
+.cr-diag-score-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 70px;
+}
+
+.cr-diag-score-big {
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+  letter-spacing: -1px;
+}
+
+.cr-diag-score-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.cr-diag-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cr-diag-headline {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+
+.cr-diag-subline {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.cr-diag-action {
+  flex-shrink: 0;
+}
+
+/* Tier Variants */
+.cr-diagnosis-hero.healthy::before { background: var(--accent); }
+.cr-diagnosis-hero.healthy .cr-diag-score-big { color: var(--accent); text-shadow: 0 0 15px rgba(110, 231, 167, 0.3); }
+.cr-diagnosis-hero.healthy { animation: cr-diag-breathe 4s ease-in-out infinite; }
+
+.cr-diagnosis-hero.concerning::before { background: var(--warn); }
+.cr-diagnosis-hero.concerning .cr-diag-score-big { color: var(--warn); }
+
+.cr-diagnosis-hero.warning::before { background: #f0a06b; }
+.cr-diagnosis-hero.warning .cr-diag-score-big { color: #f0a06b; }
+
+.cr-diagnosis-hero.critical::before { background: var(--danger); }
+.cr-diagnosis-hero.critical .cr-diag-score-big { color: var(--danger); }
+.cr-diagnosis-hero.critical { border-color: rgba(240, 107, 107, 0.3); }
+
+@keyframes cr-diag-breathe {
+  0%, 100% { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); }
+  50% { box-shadow: 0 4px 25px rgba(110, 231, 167, 0.1); border-color: rgba(110, 231, 167, 0.2); }
+}
+
 /* Appeal rows + inline mini action buttons (also reused by Settings). */
 .cr-appeal {
   flex-direction: column;

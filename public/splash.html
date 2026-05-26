@@ -21,8 +21,21 @@
         <span id="heartbeat-value" class="cr-pulse-value">--</span>
       </div>
 
-      <section id="setup-card" class="cr-card">
-        <div class="cr-card-title">SETUP</div>
+      <section id="diagnosis-hero" class="cr-diagnosis-hero hidden">
+        <div class="cr-diag-score-wrap">
+          <span id="hero-score" class="cr-diag-score-big">--</span>
+          <span class="cr-diag-score-label">Health</span>
+        </div>
+        <div class="cr-diag-main">
+          <h2 id="hero-headline" class="cr-diag-headline">Loading diagnosis…</h2>
+          <p id="hero-subline" class="cr-diag-subline">Analyzing subreddit vitals</p>
+        </div>
+        <div class="cr-diag-action">
+          <button class="cr-action" id="hero-action">Detail</button>
+        </div>
+      </section>
+
+      <section id="setup-card" class="cr-card">        <div class="cr-card-title">SETUP</div>
         <ul id="checklist" class="cr-checklist">
           <li class="cr-skel">Loading…</li>
         </ul>

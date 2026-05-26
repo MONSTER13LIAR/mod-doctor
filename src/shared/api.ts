@@ -1,12 +1,14 @@
 export type InitResponse = {
   type: "init";
   postId: string;
+  subredditName: string;
   count: number;
   username: string;
   isModerator: boolean;
   status: 'STABLE' | 'CRISIS' | 'WAITING';
   timeSinceLastAction: number;
   lastActionTimestamp?: number;
+  diagnosis?: SubDiagnosis;
 };
 
 export type ChecklistItem = {
@@ -220,6 +222,15 @@ export type SaveSecondOpinionResult = {
   message: string;
 };
 
+export type RuleDoctorResponse = {
+  suggestions: Array<{
+    title: string;
+    rule: string;
+    rationale: string;
+  }>;
+  note: string;
+};
+
 // --- Brain Health (tier + quota) ---
 // Surfaces the AI tier the dashboard is currently on:
 //   'pro'     – mod pasted their own key (BYOK), unlimited.
@@ -263,6 +274,7 @@ export const ApiEndpoint = {
   SaveSettings: "/api/save-settings",
   SecondOpinion: "/api/second-opinion",
   SaveSecondOpinion: "/api/save-second-opinion",
+  RuleDoctor: "/api/rule-doctor",
   Burnout: "/api/burnout",
   SubTemperature: "/api/sub-temperature",
   Diagnosis: "/api/diagnosis",

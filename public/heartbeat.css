@@ -141,6 +141,93 @@ body.hb-app {
   filter: drop-shadow(0 0 8px currentColor);
 }
 
+.hidden { display: none !important; }
+
+.hb-diagnosis {
+  background: var(--hb-bg-elev);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hb-diag-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.hb-diag-ring {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid var(--hb-stable);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(110, 231, 167, 0.15);
+}
+
+.hb-diag-score {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--hb-text);
+}
+
+.hb-diag-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hb-diag-label {
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  color: var(--hb-text-muted);
+  font-weight: 700;
+}
+
+.hb-diag-headline {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--hb-text);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hb-diag-deductions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hb-diag-tag {
+  font-size: 10px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  color: var(--hb-text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Tier colors */
+.hb-diagnosis.healthy .hb-diag-ring { border-color: var(--hb-stable); color: var(--hb-stable); }
+.hb-diagnosis.stable .hb-diag-ring { border-color: #94e76e; }
+.hb-diagnosis.concerning .hb-diag-ring { border-color: var(--hb-waiting); }
+.hb-diagnosis.warning .hb-diag-ring { border-color: #f0a06b; }
+.hb-diagnosis.critical .hb-diag-ring { border-color: var(--hb-crisis); }
+
 .hb-readout {
   display: grid;
   grid-template-columns: minmax(140px, 1fr) 2fr;

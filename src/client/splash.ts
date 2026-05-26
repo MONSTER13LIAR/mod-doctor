@@ -9,9 +9,10 @@ import {
   type FindModsResult,
   type ModCareResult,
   type ModVital,
-  type Recommendation,
-  type RecommendationsResponse,
-  type SaveSecondOpinionResult,
+  Recommendation,
+  RecommendationsResponse,
+  SaveSecondOpinionResult,
+  type RuleDoctorResponse,
   type SecondOpinionMode,
   type SecondOpinionStatus,
   type TeamVitalsResponse,
@@ -47,7 +48,6 @@ type Power = {
 // Order and labels mirror the approved Control Room layout.
 // Second Opinion sits next to AI Surrogate — the "absent mod coverage" + "present mod supervision" pair.
 const ALL_POWERS: Power[] = [
-  { id: "diagnosis", icon: "🩻", name: "Sub Diagnosis", sub: "Overall health score — what's wrong, what to do", needsAi: false, actionLabel: "Diagnose" },
   { id: "crisis", icon: "🏥", name: "Crisis Detection", sub: "How the heartbeat & crisis work", needsAi: false, actionLabel: "View" },
   { id: "surrogate", icon: "🤖", name: "AI Surrogate", sub: "Auto-moderate during downtime", needsAi: true, actionLabel: "Open" },
   { id: "second-opinion", icon: "🧑‍⚕️", name: "Private Doc", sub: "Heuristic + AI review of present mods", needsAi: false, actionLabel: "Open" },
@@ -72,6 +72,7 @@ async function loadDashboard(): Promise<void> {
     dashboardState = data;
     lastActionTimestamp = data.lastActionTimestamp ?? Date.now();
     renderHeader(data);
+    renderDiagnosisHero();
     renderChecklist(data);
     renderPowers(data);
     renderFooter(data);
@@ -159,6 +160,38 @@ function renderFooter(data: DashboardData): void {
   const u = document.getElementById("footer-user");
   if (v) v.textContent = `DR. MOD ${data.appVersion}`;
   if (u) u.textContent = data.username ? `u/${data.username}` : "—";
+}
+
+async function renderDiagnosisHero(): Promise<void> {
+  const hero = document.getElementById("diagnosis-hero");
+  const scoreEl = document.getElementById("hero-score");
+  const headlineEl = document.getElementById("hero-headline");
+  const sublineEl = document.getElementById("hero-subline");
+  const btn = document.getElementById("hero-action");
+  if (!hero || !scoreEl || !headlineEl || !sublineEl || !btn) return;
+
+  try {
+    const res = await fetch(ApiEndpoint.Diagnosis);
+    if (!res.ok) throw new Error();
+    const data = (await res.json()) as SubDiagnosis;
+
+    hero.classList.remove("hidden");
+    hero.classList.remove("healthy", "stable", "concerning", "warning", "critical");
+    hero.classList.add(data.tier);
+    
+    scoreEl.textContent = String(data.score);
+    headlineEl.textContent = data.headline;
+    
+    // Subline counts mods for context
+    const modLine = `${data.components.modsActive} active mod${data.components.modsActive === 1 ? '' : 's'}`;
+    const tempLine = `${data.components.tempF}°F community`;
+    sublineEl.textContent = `${modLine} · ${tempLine}`;
+
+    // Detail button shows the full report
+    btn.onclick = () => void runDiagnosis();
+  } catch (err) {
+    hero.classList.add("hidden");
+  }
 }
 
 function openDetail(title: string, body: string): void {
@@ -539,6 +572,37 @@ async function runSecondOpinion(): Promise<void> {
   renderSecondOpinion(status);
 }
 
+async function runRuleDoctor(): Promise<void> {
+  openDetail("Auto-Rule Doctor", "Scanning patterns in recent mod-team disagreements…");
+  try {
+    const res = await fetch(ApiEndpoint.RuleDoctor);
+    const data = (await res.json()) as RuleDoctorResponse;
+
+    const intro = `<div class="cr-detail-text">
+      The Rule Doctor analyzes the <b>disagreements</b> between your mod team and Dr. Mod's second opinion. These patterns often reveal gaps in your AutoModerator config.
+      <br/><br/><span class="cr-muted">${escapeHtml(data.note)}</span>
+    </div>`;
+
+    if (!data.suggestions.length) {
+      openDetailHtml("Auto-Rule Doctor", intro);
+      return;
+    }
+
+    const suggestions = data.suggestions.map((s) => `
+      <div class="row">
+        <b>${escapeHtml(s.title)}</b><br/>
+        <pre style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;font-size:0.9em;margin:8px 0;overflow-x:auto"><code>${escapeHtml(s.rule)}</code></pre>
+        <span class="cr-muted"><i>Rationale:</i> ${escapeHtml(s.rationale)}</span>
+      </div>
+    `).join("");
+
+    openDetailHtml("Auto-Rule Doctor", intro + suggestions);
+  } catch (err) {
+    console.error("[DR. Mod] rule doctor failed:", err);
+    showToast("Rule Doctor failed — check logs.");
+  }
+}
+
 function renderSecondOpinion(status: SecondOpinionStatus): void {
   const d = dashboardState;
   const tierLine = renderTierLine(d);
@@ -555,7 +619,8 @@ function renderSecondOpinion(status: SecondOpinionStatus): void {
   const buttons = `<div class="cr-appeal-actions">
     <button class="cr-mini" data-so="off">Turn off</button>
     <button class="cr-mini" data-so="nurse">Set to Nurse</button>
-    <button class="cr-mini warn" data-so="surgeon">Set to Surgeon</button>
+    <button class="cr-mini" data-so="surgeon">Set to Surgeon</button>
+    <button class="cr-mini" id="run-rule-doctor" style="margin-left:auto">💊 Auto-Rule Doctor</button>
   </div>`;
 
   const disputeBlock = status.recent.length === 0
@@ -581,6 +646,8 @@ function renderSecondOpinion(status: SecondOpinionStatus): void {
   document.querySelectorAll<HTMLButtonElement>("#detail-body button[data-so]").forEach((btn) => {
     btn.addEventListener("click", () => setSecondOpinionMode(btn.dataset.so as SecondOpinionMode));
   });
+
+  document.getElementById("run-rule-doctor")?.addEventListener("click", runRuleDoctor);
 }
 
 async function setSecondOpinionMode(mode: SecondOpinionMode): Promise<void> {

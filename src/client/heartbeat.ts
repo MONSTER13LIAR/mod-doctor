@@ -32,6 +32,7 @@ async function fetchVitals(): Promise<void> {
     applyStatus(status);
     bpm = bpmForStatus(status);
     renderReadout();
+    renderDiagnosis(data.diagnosis);
     updateLauncher();
     if (isMod && !signalPollHandle) startSignalPolling();
     if (!isMod && wasMod) stopSignalPolling();
@@ -43,8 +44,14 @@ async function fetchVitals(): Promise<void> {
 function setSub(data: InitResponse): void {
   const el = document.getElementById("hb-sub");
   if (!el) return;
-  const postId = data.postId && data.postId !== "unknown" ? data.postId : "";
-  el.textContent = postId ? `Live Monitor · ${postId}` : "Live Monitor";
+  
+  // Use subredditName if available, otherwise just say "Live Monitor"
+  const subName = data.subredditName && data.subredditName !== "unknown" 
+    ? `r/${data.subredditName}` 
+    : "";
+    
+  el.textContent = subName ? `Live Monitor · ${subName}` : "Live Monitor";
+  console.log("[Heartbeat] Updated header to:", el.textContent);
 }
 
 function bpmForStatus(s: Status): number {
@@ -88,6 +95,41 @@ function renderReadout(): void {
   }
   const ms = Date.now() - lastActionTimestamp;
   lastEl.textContent = `${formatDuration(ms)} ago`;
+}
+
+function renderDiagnosis(diag?: any): void {
+  const container = document.getElementById("hb-diagnosis");
+  if (!container) return;
+
+  if (!diag) {
+    container.classList.add("hidden");
+    return;
+  }
+
+  container.classList.remove("hidden");
+  
+  // Apply tier class
+  container.classList.remove("healthy", "stable", "concerning", "warning", "critical");
+  container.classList.add(diag.tier);
+
+  const scoreEl = document.getElementById("hb-diag-score");
+  if (scoreEl) scoreEl.textContent = String(diag.score);
+
+  const headlineEl = document.getElementById("hb-diag-headline");
+  if (headlineEl) headlineEl.textContent = diag.headline;
+
+  const deductionsEl = document.getElementById("hb-diag-deductions");
+  if (deductionsEl) {
+    const items = (diag.deductions || []) as Array<{ label: string; amount: number }>;
+    if (items.length > 0) {
+      deductionsEl.classList.remove("hidden");
+      deductionsEl.innerHTML = items
+        .map((d) => `<li class="hb-diag-tag">${d.label}</li>`)
+        .join("");
+    } else {
+      deductionsEl.classList.add("hidden");
+    }
+  }
 }
 
 function pulseSample(t: number): number {
