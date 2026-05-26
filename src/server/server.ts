@@ -67,6 +67,7 @@ const MOD_ONLY_ENDPOINTS = new Set<string>([
   ApiEndpoint.SecondOpinion,
   ApiEndpoint.SaveSecondOpinion,
   ApiEndpoint.RuleDoctor,
+  ApiEndpoint.TriageNurse,
   ApiEndpoint.Burnout,
   ApiEndpoint.SubTemperature,
   ApiEndpoint.Diagnosis,
@@ -185,6 +186,9 @@ async function onRequest(
       break;
     case ApiEndpoint.RuleDoctor:
       body = await onRuleDoctor();
+      break;
+    case ApiEndpoint.TriageNurse:
+      body = await onTriageNurse();
       break;
     case ApiEndpoint.Burnout:
       body = await onBurnout();
@@ -2239,6 +2243,99 @@ Keep the rules simple, safe, and robust. Avoid overly aggressive regex unless ne
       ? `Analyzed ${sample.length} recent disputes and found ${suggestions.length} possible patterns.`
       : "Analyzed recent disputes but didn't find clear enough patterns to suggest specific rules yet."
   };
+}
+
+async function onTriageNurse(): Promise<TriageNurseResponse> {
+  const { key: aiKey } = await getEffectiveAiKey('second-opinion'); // Re-use SO tier
+  if (!aiKey) {
+    return { items: [], note: "AI brain not available. Please inject a Gemini key in Settings." };
+  }
+
+  const subredditName = context.subredditName;
+  if (!subredditName) return { items: [], note: "No subreddit context." };
+
+  try {
+    // Fetch latest 10 modmail conversations
+    const convs = await reddit.modMail.getConversations({
+      subredditName,
+      limit: 10,
+    });
+
+    const items: TriageNurseItem[] = [];
+    const triagedIdsKey = 'dr_mod:triaged_modmail';
+    const alreadyTriaged = await redis.sMembers(triagedIdsKey).catch(() => [] as string[]);
+    const triagedSet = new Set(alreadyTriaged);
+
+    for (const conv of convs.conversations) {
+      if (!conv.id || triagedSet.has(conv.id)) continue;
+
+      // Skip messages from the bot itself or AutoMod
+      const author = conv.participant?.name;
+      if (!author || author === 'AutoModerator' || author.toLowerCase() === 'mod-doctor') continue;
+
+      // AI Triage
+      const prompt = `You are the DR. Mod Triage Nurse. Analyze this Reddit Modmail conversation and categorize it.
+AUTHOR: u/${author}
+SUBJECT: ${conv.subject}
+LATEST MESSAGE: ${conv.lastMessage?.body?.substring(0, 500) || '[No body]'}
+
+CATEGORIES:
+URGENT: Serious threats, harassment, or time-sensitive emergencies.
+APPEAL: Requests to reverse a ban or removal.
+SPAM: Advertising, gibberish, or obvious bot messages.
+PARTNER: Collaboration requests or subreddit business.
+INQUIRY: General questions about rules or content.
+
+Respond in EXACTLY this format:
+CATEGORY: <ONE_OF_THE_ABOVE>
+SUMMARY: <One short sentence summarizing the user's intent>
+
+VERDICT must be one of the 5 categories above.`;
+
+      const text = await callGemini(aiKey, prompt, 200);
+      if (!text) continue;
+
+      const categoryMatch = text.match(/CATEGORY:\s*(URGENT|APPEAL|SPAM|PARTNER|INQUIRY)/i);
+      const category = (categoryMatch ? categoryMatch[1].toUpperCase() : 'INQUIRY') as TriageNurseItem['category'];
+      const summaryMatch = text.match(/SUMMARY:\s*(.+)/i);
+      const summary = summaryMatch ? summaryMatch[1].trim() : 'Routine modmail conversation.';
+
+      // Add mod-note to the thread
+      try {
+        await reddit.modMail.createConversationResponse({
+          conversationId: conv.id,
+          body: `🩺 **DR. Mod Triage Nurse Diagnosis:**\n\n**Category:** ${category}\n**Summary:** ${summary}\n\n*Note: This is an automated internal diagnosis.*`,
+          isInternal: true,
+        });
+      } catch (e) {
+        console.warn(`[DR. Mod] Failed to add mod-note to ${conv.id}`, e);
+      }
+
+      const item: TriageNurseItem = {
+        id: conv.id,
+        author: author || 'unknown',
+        status: conv.isHighlighted ? 'Highlighted' : (conv.isArchived ? 'Archived' : 'New'),
+        category,
+        summary,
+        triagedAt: Date.now(),
+      };
+      items.push(item);
+      
+      // Mark as triaged so we don't note it again
+      await redis.sAdd(triagedIdsKey, conv.id);
+      await redis.expire(triagedIdsKey, 30 * 24 * 60 * 60); // 30 days
+    }
+
+    return {
+      items,
+      note: items.length > 0 
+        ? `Triage complete. ${items.length} new conversation${items.length === 1 ? '' : 's'} diagnosed with private mod-notes.`
+        : "No new modmail conversations found that needed triage."
+    };
+  } catch (e) {
+    console.error('[DR. Mod] onTriageNurse failed:', e);
+    return { items: [], note: "Failed to scan modmail. Ensure the app has Modmail permissions." };
+  }
 }
 
 async function onTeamVitals(): Promise<{ mods: ModVital[] }> {

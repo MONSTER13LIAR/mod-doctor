@@ -13,6 +13,7 @@ import {
   RecommendationsResponse,
   SaveSecondOpinionResult,
   type RuleDoctorResponse,
+  type TriageNurseResponse,
   type SecondOpinionMode,
   type SecondOpinionStatus,
   type TeamVitalsResponse,
@@ -34,6 +35,7 @@ type PowerId =
   | "report"
   | "burnout"
   | "sub-temp"
+  | "triage"
   | "settings";
 
 type Power = {
@@ -58,6 +60,7 @@ const ALL_POWERS: Power[] = [
   { id: "report", icon: "📊", name: "Weekly Health Report", sub: "7-day team summary", needsAi: false, actionLabel: "View" },
   { id: "burnout", icon: "🔥", name: "Burnout Watch", sub: "Predicts who's headed for flatline next", needsAi: false, actionLabel: "View" },
   { id: "sub-temp", icon: "🌡️", name: "Sub Temperature", sub: "Is your community running a fever?", needsAi: false, actionLabel: "Check" },
+  { id: "triage", icon: "👩‍⚕️", name: "Triage Nurse", sub: "AI-categorize latest modmail", needsAi: true, actionLabel: "Scan" },
   { id: "settings", icon: "🔧", name: "Settings", sub: "Threshold, mode & brain", needsAi: false, actionLabel: "Open" },
 ];
 
@@ -233,6 +236,7 @@ async function handlePower(id: PowerId, btn: HTMLButtonElement): Promise<void> {
       case "report": await runReport(); break;
       case "burnout": await runBurnout(); break;
       case "sub-temp": await runSubTemperature(); break;
+      case "triage": await runTriageNurse(); break;
       case "settings": runSettings(); break;
     }
   } catch (err) {
@@ -416,6 +420,47 @@ async function runSubTemperature(): Promise<void> {
   const history = `<div class="row"><b>Last 7 days:</b><br/>${sparkline}</div>`;
 
   openDetailHtml("Sub Temperature", intro + reading + reco + history);
+}
+
+// --- Triage Nurse (AI-categorize modmail) ---
+async function runTriageNurse(): Promise<void> {
+  openDetail("Triage Nurse", "Scanning latest modmail threads for autonomous diagnosis…");
+  try {
+    const res = await fetch(ApiEndpoint.TriageNurse);
+    const data = (await res.json()) as TriageNurseResponse;
+
+    const intro = `<div class="cr-detail-text">
+      The Triage Nurse scans your latest modmail conversations and leaves <b>private mod-notes</b> with an AI category and summary. This helps you prioritize your inbox without opening every thread.
+      <br/><br/><span class="cr-muted">${escapeHtml(data.note)}</span>
+    </div>`;
+
+    if (!data.items.length) {
+      openDetailHtml("Triage Nurse", intro);
+      return;
+    }
+
+    const rows = data.items.map((item) => {
+      const color = 
+        item.category === 'URGENT' ? '#f06b6b' :
+        item.category === 'APPEAL' ? '#f5b53d' :
+        item.category === 'SPAM' ? '#8b96a5' :
+        item.category === 'PARTNER' ? '#b990ff' :
+        '#6ee7a7';
+      
+      return `<div class="row">
+        <div>
+          <b style="color:${color}">[${item.category}]</b> 
+          u/${escapeHtml(item.author)} · <span class="cr-muted">${escapeHtml(item.status)}</span>
+        </div>
+        <div class="cr-muted" style="margin-top:2px">${escapeHtml(item.summary)}</div>
+      </div>`;
+    }).join("");
+
+    openDetailHtml("Triage Nurse", intro + rows);
+  } catch (err) {
+    console.error("[DR. Mod] triage nurse failed:", err);
+    showToast("Triage Nurse failed — ensure app has Modmail permissions.");
+  }
 }
 
 // --- Mod Team Care: run the pass, then show what's pending ---

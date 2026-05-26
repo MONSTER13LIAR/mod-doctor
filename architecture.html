@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dr. Mod | System Architecture</title>
+    <style>
+        :root {
+            --bg: #06080b;
+            --card-bg: #0e1218;
+            --accent: #6ee7a7;
+            --crisis: #f06b6b;
+            --waiting: #f5b53d;
+            --text: #d7dde6;
+            --text-muted: #8b96a5;
+            --border: #1d242d;
+            --glow: rgba(110, 231, 167, 0.15);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            letter-spacing: 2px;
+            margin: 0;
+            color: var(--accent);
+            text-shadow: 0 0 20px var(--glow);
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1.1em;
+            margin-top: 10px;
+        }
+
+        /* Flowchart Container */
+        .system-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            max-width: 1000px;
+            width: 100%;
+            position: relative;
+        }
+
+        /* Connecting Lines (SVG) */
+        .lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Layer Styles */
+        .layer {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .node {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            width: 220px;
+            text-align: center;
+            position: relative;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .node:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+        }
+
+        .node.hero {
+            border: 2px solid var(--accent);
+            width: 300px;
+            background: linear-gradient(145deg, #0e1218 0%, #15201a 100%);
+        }
+
+        .node.logic {
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a1f26;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .node h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        .node p {
+            margin: 0;
+            font-size: 0.85em;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .icon {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        /* Flow Indicators */
+        .status-tag {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .tag-stable { background: var(--accent); color: #000; }
+        .tag-crisis { background: var(--crisis); color: #fff; }
+
+        .footer {
+            margin-top: 60px;
+            color: var(--text-muted);
+            font-size: 0.9em;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+            text-align: center;
+            width: 100%;
+        }
+
+        /* ECG Line Effect */
+        .ecg-line {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            margin: 20px 0;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>DR. MOD</h1>
+        <p>AUTONOMIC NERVOUS SYSTEM ARCHITECTURE</p>
+    </div>
+
+    <div class="system-grid">
+        <!-- Layer 1: Telemetry -->
+        <div class="layer">
+            <div class="node">
+                <span class="icon">📈</span>
+                <h3>Telemetry Layer</h3>
+                <p>Monitors human moderator actions via Reddit's asynchronous mod-log hooks.</p>
+            </div>
+        </div>
+
+        <div class="ecg-line"></div>
+
+        <!-- Layer 2: Core Processing -->
+        <div class="layer">
+            <div class="node hero">
+                <span class="icon">🩻</span>
+                <h3>Sub Diagnosis Engine</h3>
+                <p>Rolls 12 telemetry signals into a real-time 0-100 health substrate using stateful Redis analysis.</p>
+                <span class="status-tag tag-stable">Telemetry Ingested</span>
+            </div>
+        </div>
+
+        <!-- Layer 3: Branching Monitoring -->
+        <div class="layer">
+            <div class="node">
+                <span class="icon">🔥</span>
+                <h3>Burnout Watch</h3>
+                <p>Heuristic trend analysis: 7d actions vs 30d baseline to predict mod latency.</p>
+            </div>
+            <div class="node">
+                <span class="icon">🌡️</span>
+                <h3>Sub Temperature</h3>
+                <p>Real-time toxicity sampling to detect community mood shifts without AI cost.</p>
+            </div>
+        </div>
+
+        <!-- Layer 4: The Logic Gate -->
+        <div class="layer">
+            <div class="node logic">
+                PULSE<br>DETECTED?
+            </div>
+        </div>
+
+        <!-- Layer 5: Response Paths -->
+        <div class="layer">
+            <div class="node">
+                <span class="icon">🟢</span>
+                <h3>Stable Mode</h3>
+                <p>Private Doc (Heuristic) reviews calls for consistency. No automated action.</p>
+            </div>
+            <div class="node" style="border-color: var(--crisis);">
+                <span class="icon">🤖</span>
+                <h3>Surgical Crisis Mode</h3>
+                <p>Google Gemini AI Surgeon assumes control. Failover to zero-touch moderation.</p>
+                <span class="status-tag tag-crisis">Failover Engaged</span>
+            </div>
+        </div>
+
+        <!-- Layer 6: Long-term Recovery -->
+        <div class="layer">
+            <div class="node hero" style="border-color: var(--waiting);">
+                <span class="icon">🎯</span>
+                <h3>Succession Planning</h3>
+                <p>If Crisis persists >24h, AI Scout automatically scans for mod candidates and alerts the owner.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Dr. Mod Architecture | mod-doctor | Reddit Hackathon 2026
+    </div>
+
+</body>
+</html>

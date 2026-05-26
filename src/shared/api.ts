@@ -231,6 +231,20 @@ export type RuleDoctorResponse = {
   note: string;
 };
 
+export type TriageNurseItem = {
+  id: string;
+  author: string;
+  status: string;
+  category: 'URGENT' | 'APPEAL' | 'SPAM' | 'INQUIRY' | 'PARTNER';
+  summary: string;
+  triagedAt: number;
+};
+
+export type TriageNurseResponse = {
+  items: TriageNurseItem[];
+  note: string;
+};
+
 // --- Brain Health (tier + quota) ---
 // Surfaces the AI tier the dashboard is currently on:
 //   'pro'     – mod pasted their own key (BYOK), unlimited.
@@ -275,6 +289,7 @@ export const ApiEndpoint = {
   SecondOpinion: "/api/second-opinion",
   SaveSecondOpinion: "/api/save-second-opinion",
   RuleDoctor: "/api/rule-doctor",
+  TriageNurse: "/api/triage-nurse",
   Burnout: "/api/burnout",
   SubTemperature: "/api/sub-temperature",
   Diagnosis: "/api/diagnosis",
